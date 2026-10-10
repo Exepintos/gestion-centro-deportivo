@@ -90,8 +90,9 @@ const FIREBASE_CONFIG = {
   appId: "1:350629624182:web:f8b311d4c01e9e05712257"
 };
 const PRODUCTO = "Gestión Centro Deportivo";
-const CONTACTO = "3865859130"; 
-const PRODUCTO='Gestión Centro Deportiv',CONTACTO='Contacto: 3865859130',TRIAL=14,DEF='Mi Centro Deportivo';
+const CONTACTO = "3865859130";
+const TRIAL = 14;
+const DEF = "Mi Centro Deportivo";
 let S=null,uidCur=null,saveT=null,sent={};
 const setStat=t=>{const e=$('#sv');if(e)e.textContent=t};
 function save(){if(!uidCur||!S)return;setStat('Guardando…');clearTimeout(saveT);saveT=setTimeout(()=>{saveT=null;persist()},700)}
