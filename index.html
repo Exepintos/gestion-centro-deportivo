@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gestión Deportiva</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef2f1;--panel:#fff;--ink:#14272e;--mute:#5d7078;--line:#d9e2e0;--side:#0f3441;--acc:#0e7c86;--ok:#17803d;--warn:#b45309;--bad:#b42318;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{background:var(--bg);color:var(--ink);font-family:'Barlow',system-ui,sans-serif;margin:0}
+.hd{font-family:'Barlow Condensed','Barlow',sans-serif;letter-spacing:.01em}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.inp{width:100%;border:1px solid var(--line);border-radius:6px;padding:.5rem .65rem;background:#fff;color:var(--ink)}
+.inp:focus,.btn:focus-visible,.nav:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.btn{background:var(--acc);color:#fff;border-radius:6px;padding:.5rem .9rem;font-weight:600}
+.btn:hover{filter:brightness(.92)}
+.btn2{border:1px solid var(--line);border-radius:6px;padding:.35rem .7rem;font-size:.85rem;background:#fff}
+.btn2:hover{background:#f3f7f6}
+.nav{display:block;width:100%;text-align:left;padding:.55rem .9rem;border-radius:6px;color:#bcd3d8;font-weight:500;white-space:nowrap}
+.nav:hover{background:rgba(255,255,255,.08)}
+.nav.on{background:#fff;color:var(--side)}
+.tag{display:inline-block;padding:.1rem .55rem;border-radius:99px;font-size:.78rem;font-weight:600}
+.Pagado{background:#dcf5e5;color:var(--ok)}.Pendiente{background:#e6edf0;color:#3d5560}.Porvencer{background:#fdeccd;color:var(--warn)}.Vencido{background:#fde0dd;color:var(--bad)}
+.chip{background:#e3f1f2;color:#0b5d65;border-radius:99px;padding:.1rem .55rem;font-size:.78rem;margin:.1rem .15rem .1rem 0;display:inline-block}
+th{text-align:left;font-weight:600;color:var(--mute);font-size:.85rem;padding:.6rem .8rem;border-bottom:1px solid var(--line)}
+td{padding:.65rem .8rem;border-bottom:1px solid var(--line);vertical-align:top}
+.scroll{overflow-x:auto}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<section id="login" class="min-h-screen flex items-center justify-center p-4" hidden>
+  <div class="card w-full max-w-sm p-7">
+    <div id="lbrand" class="flex items-center gap-3 mb-1"></div>
+    <p class="mb-4" style="color:var(--mute)">Administrá alumnos, disciplinas y pagos de tu centro.</p>
+    <div class="flex gap-2 mb-4"><button id="tabI" class="btn flex-1">Ingresar</button><button id="tabR" class="btn2 flex-1">Crear cuenta</button></div>
+    <label class="block text-sm font-medium mb-1" for="u">Correo electrónico</label>
+    <input id="u" type="email" class="inp mb-3" autocomplete="email">
+    <label class="block text-sm font-medium mb-1" for="p">Contraseña</label>
+    <input id="p" type="password" class="inp mb-3" autocomplete="current-password">
+    <p id="lerr" class="text-sm mb-3" style="color:var(--bad)" hidden></p>
+    <button id="lbtn" class="btn w-full">Ingresar</button>
+    <button id="lreset" class="text-sm mt-3 underline" style="color:var(--mute)">Olvidé mi contraseña</button>
+    <p id="lnote" class="text-xs mt-3" style="color:var(--mute)" hidden>Al crear tu cuenta tenés 14 días de prueba gratis. Tus datos son privados: solo vos los ves.</p>
+  </div>
+</section>
+<section id="load" class="min-h-screen flex items-center justify-center" style="color:var(--mute)" hidden>Cargando…</section>
+<section id="block" class="min-h-screen flex items-center justify-center p-4" hidden>
+  <div class="card w-full max-w-md p-7 text-center"><h2 id="bt" class="hd text-3xl font-bold mb-2"></h2><p id="bm" style="color:var(--mute)"></p><button id="bout" class="btn2 mt-5">Cerrar sesión</button></div>
+</section>
+
+<!-- APP -->
+<div id="app" class="min-h-screen flex flex-col md:flex-row" hidden>
+  <aside class="md:w-56 md:min-h-screen p-3 md:p-4 flex md:flex-col gap-2 items-center md:items-stretch" style="background:var(--side)">
+    <div id="sbrand" class="flex items-center gap-2 md:mb-4 px-2"></div>
+    <nav class="flex md:flex-col gap-1 flex-1 md:flex-none scroll" id="nav"></nav>
+    <span id="sv" class="hidden md:block text-xs px-2 md:mt-auto" style="color:#8fb3bb"></span>
+    <button id="out" class="nav md:mt-1 w-auto md:w-full" style="color:#f4b8b0">Cerrar sesión</button>
+  </aside>
+  <main class="flex-1 p-4 md:p-8 min-w-0">
+    <div id="banner" class="mb-4 text-sm rounded-md p-3" style="background:#fdeccd;color:#8a5a00" hidden></div>
+    <div id="view"></div>
+  </main>
+</div>
+
+<!-- MODAL -->
+<div id="modal" class="fixed inset-0 flex items-center justify-center p-4" style="background:rgba(10,30,36,.55)" hidden>
+  <div class="card w-full max-w-md p-6 max-h-full overflow-y-auto" id="mbox"></div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9);
+const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n||0);
+const today=new Date(), ym=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const perLabel=p=>{if(!p)return'—';const[y,m]=p.split('-');const t=new Date(y,m-1,1).toLocaleDateString('es',{month:'long',year:'numeric'});return t[0].toUpperCase()+t.slice(1)};
+const fdate=f=>f?new Date(f+'T12:00:00').toLocaleDateString('es-AR'):'—';
+const firebaseConfig = {
+  apiKey: "AIzaSyBZV9jIqr0NPl9gF-zCNXL-iNKTfkINFkA",
+  authDomain: "gestion-centro-deportivo-6994d.firebaseapp.com",
+  projectId: "gestion-centro-deportivo-6994d",
+  storageBucket: "gestion-centro-deportivo-6994d.firebasestorage.app",
+  messagingSenderId: "350629624182",
+  appId: "1:350629624182:web:f8b311d4c01e9e05712257"
+};
+const PRODUCTO='Gestión Centro Deportiv',CONTACTO='Contacto: 3865859130',TRIAL=14,DEF='Mi Centro Deportivo';
+let S=null,uidCur=null,saveT=null,sent={};
+const setStat=t=>{const e=$('#sv');if(e)e.textContent=t};
+function save(){if(!uidCur||!S)return;setStat('Guardando…');clearTimeout(saveT);saveT=setTimeout(()=>{saveT=null;persist()},700)}
+async function persist(){
+  const {doc,setDoc,deleteDoc}=F.fs,db=F.db,u=uidCur;
+  try{
+    await setDoc(doc(db,'centros',u),{cfg:S.cfg,disc:S.disc,alumnos:S.alumnos,actualizado:Date.now()});
+    const g={};S.pagos.forEach(p=>(g[p.periodo]=g[p.periodo]||[]).push(p));
+    for(const k in g){const j=JSON.stringify(g[k]);if(sent[k]!==j){await setDoc(doc(db,'centros',u,'pagos',k),{items:g[k]});sent[k]=j}}
+    for(const k in sent)if(!g[k]){await deleteDoc(doc(db,'centros',u,'pagos',k));delete sent[k]}
+    setStat('Guardado')
+  }catch(e){
+    if(e.code==='permission-denied')block('Acceso suspendido','Tu acceso está suspendido. Tus datos siguen guardados. '+CONTACTO);
+    else setStat('Error al guardar: revisá tu conexión')}
+}
+window.addEventListener('beforeunload',e=>{if(saveT){e.preventDefault();e.returnValue=''}});
+
+let view='dash',filt={estado:'',periodo:''},dm=ym(today),tmpLogo='';
+const NAV=[['dash','Resumen'],['alumnos','Alumnos'],['disc','Disciplinas'],['pagos','Pagos'],['cfg','Configuración']];
+const alumno=id=>S.alumnos.find(a=>a.id===id);
+const disc=id=>S.disc.find(d=>d.id===id);
+const dias=f=>Math.round((new Date(f+'T12:00:00')-new Date(iso(today)+'T12:00:00'))/864e5);
+const estado=p=>{if(p.pagado)return'Pagado';const d=dias(p.vence);return d<0?'Vencido':d<=5?'Por vencer':'Pendiente'};
+const cls=e=>e.replace(' ','');
+const tag=e=>`<span class="tag ${cls(e)}">${e}</span>`;
+const deuda=a=>S.pagos.filter(p=>p.alumno===a.id&&estado(p)==='Vencido');
+const activo=a=>a.insc.length>0&&!deuda(a).some(p=>dias(p.vence)<-30);
+
+/* ---------- marca ---------- */
+function brand(){
+  $('#lbrand').innerHTML=`<span class="hd text-4xl font-bold" style="color:var(--side)">${esc(PRODUCTO)}</span>`;
+  if(!S){document.title=PRODUCTO;return}
+  const n=esc(S.cfg.nombre),l=S.cfg.logo?`<img src="${S.cfg.logo}" alt="" class="h-10 w-10 object-contain rounded bg-white p-0.5">`:'';
+  $('#sbrand').innerHTML=l+`<span class="hd text-2xl font-bold text-white hidden md:inline">${n}</span>`;
+  document.title=S.cfg.nombre+' · Gestión';
+}
+
+/* ---------- acceso (Firebase) ---------- */
+let F={},mode='in',trialLeft=null;
+const show=id=>['login','load','block','app'].forEach(k=>$('#'+k).hidden=k!==id);
+const block=(t,m)=>{$('#bt').textContent=t;$('#bm').textContent=m;show('block')};
+const FERR={'auth/invalid-credential':'Correo o contraseña incorrectos.','auth/wrong-password':'Correo o contraseña incorrectos.','auth/user-not-found':'Correo o contraseña incorrectos.','auth/email-already-in-use':'Ese correo ya tiene una cuenta. Probá ingresar.','auth/weak-password':'La contraseña debe tener al menos 6 caracteres.','auth/invalid-email':'El correo no es válido.','auth/too-many-requests':'Demasiados intentos. Esperá unos minutos.','auth/network-request-failed':'Sin conexión. Revisá tu internet.'};
+const lerr=m=>{$('#lerr').textContent=m;$('#lerr').hidden=!m};
+function setMode(m){mode=m;$('#tabI').className=m==='in'?'btn flex-1':'btn2 flex-1';$('#tabR').className=m==='reg'?'btn flex-1':'btn2 flex-1';$('#lbtn').textContent=m==='in'?'Ingresar':'Crear cuenta';$('#lnote').hidden=m!=='reg';$('#p').autocomplete=m==='in'?'current-password':'new-password';lerr('')}
+$('#tabI').onclick=()=>setMode('in');$('#tabR').onclick=()=>setMode('reg');
+$('#lbtn').onclick=async()=>{lerr('');const e=$('#u').value.trim(),p=$('#p').value;if(!e||!p){lerr('Completá el correo y la contraseña.');return}
+  try{mode==='in'?await F.signIn(F.auth,e,p):await F.signUp(F.auth,e,p)}catch(x){lerr(FERR[x.code]||'No se pudo completar la acción. Intentá de nuevo.')}};
+$('#p').onkeydown=e=>{if(e.key==='Enter')$('#lbtn').click()};
+$('#lreset').onclick=async()=>{const e=$('#u').value.trim();if(!e){lerr('Escribí tu correo y volvé a tocar este botón.');return}
+  try{await F.reset(F.auth,e);lerr('');alert('Te enviamos un correo para restablecer la contraseña.')}catch(x){lerr(FERR[x.code]||'No se pudo enviar el correo.')}};
+const logout=async()=>{if(saveT){clearTimeout(saveT);saveT=null;await persist()}F.signOut(F.auth)};
+$('#out').onclick=logout;$('#bout').onclick=logout;
+
+async function initFB(){
+  brand();
+  if(FIREBASE_CONFIG.apiKey.startsWith('PEGAR')){block('Falta configurar Firebase','Pegá los datos de tu proyecto en FIREBASE_CONFIG, al inicio del script de index.html.');return}
+  show('load');
+  try{
+    const V='https://www.gstatic.com/firebasejs/10.12.2/';
+    const [a,au,fs]=await Promise.all([import(V+'firebase-app.js'),import(V+'firebase-auth.js'),import(V+'firebase-firestore.js')]);
+    const app=a.initializeApp(FIREBASE_CONFIG);
+    F={auth:au.getAuth(app),db:fs.getFirestore(app),signIn:au.signInWithEmailAndPassword,signUp:au.createUserWithEmailAndPassword,signOut:au.signOut,reset:au.sendPasswordResetEmail,fs};
+    au.onAuthStateChanged(F.auth,u=>{if(u)enter(u);else{S=null;uidCur=null;sent={};brand();show('login');setMode(mode)}});
+  }catch(e){block('No se pudo conectar','Revisá tu conexión a internet y recargá la página.')}
+}
+async function enter(u){
+  show('load');const {doc,getDoc,setDoc,serverTimestamp}=F.fs,db=F.db;
+  try{
+    let ls=await getDoc(doc(db,'licencias',u.uid));
+    if(!ls.exists()){await setDoc(doc(db,'licencias',u.uid),{email:u.email,estado:'prueba',creado:serverTimestamp()});ls=await getDoc(doc(db,'licencias',u.uid))}
+    const L=ls.data(),est=L.estado,ms=L.creado&&L.creado.toDate?Date.now()-L.creado.toDate().getTime():0;
+    trialLeft=est==='prueba'?Math.ceil(TRIAL-ms/864e5):null;
+    if(est==='suspendido')return block('Acceso suspendido','Tu acceso está suspendido. Tus datos siguen guardados y se recuperan al reactivar el servicio. '+CONTACTO);
+    if(est==='prueba'&&trialLeft<=0)return block('Terminó tu prueba gratuita','Tus datos siguen guardados. Para seguir usando el sistema, activá tu plan. '+CONTACTO);
+    if(est!=='activo'&&est!=='prueba')return block('Acceso no disponible',CONTACTO);
+    await loadData(u.uid);
+    view='dash';brand();setStat('');
+    const b=$('#banner');b.hidden=trialLeft===null;if(trialLeft!==null)b.textContent='Prueba gratuita: te quedan '+trialLeft+' día'+(trialLeft===1?'':'s')+'. '+CONTACTO;
+    show('app');render();
+  }catch(e){
+    if(e.code==='permission-denied')block('Acceso no disponible','No tenés permiso para ver los datos. '+CONTACTO);
+    else block('No se pudieron cargar los datos','Revisá tu conexión y recargá la página.')}
+}
+async function loadData(uid){
+  const {doc,getDoc,getDocs,collection}=F.fs,db=F.db;
+  const m=await getDoc(doc(db,'centros',uid)),ps=await getDocs(collection(db,'centros',uid,'pagos')),d=m.exists()?m.data():{};
+  S={cfg:{nombre:DEF,logo:'',...(d.cfg||{})},disc:d.disc||[],alumnos:d.alumnos||[],pagos:[]};
+  sent={};ps.forEach(x=>{const it=x.data().items||[];S.pagos.push(...it);sent[x.id]=JSON.stringify(it)});
+  uidCur=uid;if(!m.exists())save();
+}
+
+/* ---------- modal ---------- */
+function openModal(html){$('#mbox').innerHTML=html;$('#modal').hidden=false}
+function closeModal(){$('#modal').hidden=true}
+$('#modal').onclick=e=>{if(e.target.id==='modal')closeModal()};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
+const field=(l,h)=>`<label class="block mb-3 text-sm font-medium">${l}<div class="mt-1 font-normal">${h}</div></label>`;
+const actions=ok=>`<div class="flex justify-end gap-2 mt-5"><button type="button" class="btn2" onclick="closeModal()">Cancelar</button><button class="btn">${ok}</button></div>`;
+
+/* ---------- render ---------- */
+function render(){
+  $('#nav').innerHTML=NAV.map(([k,l])=>`<button class="nav ${view===k?'on':''}" data-v="${k}">${l}</button>`).join('');
+  $('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{view=b.dataset.v;render()});
+  $('#view').innerHTML=({dash,alumnos:vAlumnos,disc:vDisc,pagos:vPagos,cfg:vCfg})[view]();
+}
+const head=(t,sub,btn)=>`<div class="flex flex-wrap items-end justify-between gap-3 mb-6"><div><h2 class="hd text-4xl font-bold">${t}</h2><p style="color:var(--mute)">${sub}</p></div>${btn||''}</div>`;
+const empty=t=>`<div class="p-8 text-center" style="color:var(--mute)">${t}</div>`;
+
+const WID=[['stats','Tarjetas de resumen'],['ing','Ingresos por mes'],['cnt','Cantidad de pagos por mes'],['est','Estado de los pagos'],['deu','Alumnos con deuda'],['dis','Alumnos por disciplina'],['rec','Últimos movimientos']];
+const vis=k=>(S.cfg.vis||{})[k]!==false;
+let pers=false;
+function toggleVis(k,on){S.cfg.vis=S.cfg.vis||{};S.cfg.vis[k]=on;save();render()}
+const k1=n=>n>=1000?+(n/1000).toFixed(1)+'k':n;
+function bars(v,l,c){const m=Math.max(1,...v),w=360/v.length;return`<svg viewBox="0 0 360 165" class="w-full" role="img" aria-label="Gráfico de barras">`+v.map((x,i)=>{const h=x/m*105,X=i*w+w*.18,W=w*.64;return`<rect x="${X}" y="${130-h}" width="${W}" height="${h}" rx="3" style="fill:${c}"/><text x="${X+W/2}" y="${124-h}" text-anchor="middle" font-size="11" style="fill:var(--ink)">${k1(x)}</text><text x="${X+W/2}" y="150" text-anchor="middle" font-size="11" style="fill:var(--mute)">${l[i]}</text>`}).join('')+`</svg>`}
+const box=(t,sub,body)=>`<div class="card p-5"><h3 class="hd text-2xl font-bold">${t}</h3><p class="text-sm mb-3" style="color:var(--mute)">${sub}</p>${body}</div>`;
+const meter=(n,tot)=>`<div class="h-2 rounded-full mt-1" style="background:#e3ecea"><div class="h-2 rounded-full" style="width:${n/Math.max(1,tot)*100}%;background:var(--acc)"></div></div>`;
+
+function dash(){
+  const act=S.alumnos.filter(activo).length;
+  const paid=k=>S.pagos.filter(p=>p.pagado&&(p.fecha||'').startsWith(k));
+  const sm=l=>l.reduce((s,p)=>s+Number(p.monto),0);
+  const ing=sm(paid(dm));
+  const sin=S.pagos.filter(p=>!p.pagado);
+  const pend=sin.filter(p=>estado(p)!=='Vencido'),venc=sin.filter(p=>estado(p)==='Vencido'),pv=pend.filter(p=>estado(p)==='Por vencer').length;
+  const stat=(l,v,c,sub)=>`<div class="card p-5"><div class="text-sm" style="color:var(--mute)">${l}</div><div class="hd text-5xl font-bold mt-1" style="color:${c}">${v}</div><div class="text-sm" style="color:var(--mute)">${sub}</div></div>`;
+  const [y,m]=dm.split('-').map(Number),mk=[...Array(6)].map((_,i)=>new Date(y,m-1-(5-i),1));
+  const keys=mk.map(ym),lab=mk.map(d=>d.toLocaleDateString('es',{month:'short'}).replace('.','')),serI=keys.map(k=>sm(paid(k))),serC=keys.map(k=>paid(k).length);
+  const ests=['Pagado','Pendiente','Por vencer','Vencido'],ec=ests.map(e=>S.pagos.filter(p=>estado(p)===e).length);
+  const dd={};venc.forEach(p=>{const a=alumno(p.alumno);if(!a)return;const o=dd[a.id]=dd[a.id]||{n:a.nombre,t:0,c:0};o.t+=Number(p.monto);o.c++});
+  const deu=Object.values(dd).sort((a,b)=>b.t-a.t).slice(0,5);
+  const max=Math.max(1,...S.disc.map(d=>S.alumnos.filter(a=>a.insc.some(i=>i.d===d.id)).length));
+  const rec=[...S.pagos].sort((a,b)=>(b.fecha||b.vence).localeCompare(a.fecha||a.vence)).slice(0,5);
+  const W={
+   stats:`<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">${stat('Alumnos activos',act,'var(--side)',`de ${S.alumnos.length} registrados`)}${stat('Ingresos del mes',money(ing),'var(--ok)','según fecha de pago')}${stat('Pagos pendientes',pend.length,'var(--warn)',`${pv} por vencer · ${money(sm(pend))}`)}${stat('Pagos vencidos',venc.length,'var(--bad)',money(sm(venc))+' sin cobrar')}</div>`,
+   ing:box('Ingresos por mes',`Últimos 6 meses · total ${money(sm(keys.flatMap(paid)))}`,bars(serI,lab,'var(--acc)')),
+   cnt:box('Cantidad de pagos por mes',`Pagos cobrados · total ${serC.reduce((a,b)=>a+b,0)}`,bars(serC,lab,'#e08a2e')),
+   est:box('Estado de los pagos','Todos los pagos registrados',S.pagos.length?ests.map((e,i)=>`<div class="mb-2"><div class="flex justify-between text-sm">${tag(e)}<b>${ec[i]}</b></div>${meter(ec[i],S.pagos.length)}</div>`).join(''):empty('Aún no se registraron pagos.')),
+   deu:box('Alumnos con deuda','Cuotas vencidas sin cobrar',deu.length?deu.map(o=>`<div class="flex justify-between py-2 border-b" style="border-color:var(--line)"><span class="font-medium">${esc(o.n)} <span class="text-sm font-normal" style="color:var(--mute)">${o.c} cuota${o.c>1?'s':''}</span></span><b style="color:var(--bad)">${money(o.t)}</b></div>`).join(''):empty('Nadie tiene cuotas vencidas.')),
+   dis:box('Alumnos por disciplina','Inscripciones actuales',S.disc.length?S.disc.map(d=>{const n=S.alumnos.filter(a=>a.insc.some(i=>i.d===d.id)).length;return`<div class="mb-3"><div class="flex justify-between text-sm"><span>${esc(d.nombre)}</span><b>${n}</b></div>${meter(n,max)}</div>`}).join(''):empty('Todavía no hay disciplinas. Agregá la primera en Disciplinas.')),
+   rec:box('Últimos movimientos','Los 5 más recientes',rec.length?rec.map(p=>`<div class="flex justify-between items-center py-2 border-b" style="border-color:var(--line)"><div><div class="font-medium">${esc(alumno(p.alumno)?.nombre||'Alumno eliminado')}</div><div class="text-sm" style="color:var(--mute)">${perLabel(p.periodo)}</div></div><div class="text-right"><div>${money(p.monto)}</div>${tag(estado(p))}</div></div>`).join(''):empty('Aún no se registraron pagos.'))};
+  const grid=['ing','cnt','est','deu','dis','rec'].filter(vis).map(k=>W[k]).join('');
+  const panel=pers?`<div class="card p-4 mb-5"><div class="text-sm font-medium mb-2">Elegí qué mostrar en el resumen</div><div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">${WID.map(([k,l])=>`<label class="flex items-center gap-2 text-sm"><input type="checkbox" ${vis(k)?'checked':''} onchange="toggleVis('${k}',this.checked)">${l}</label>`).join('')}</div></div>`:'';
+  return head('Resumen',`Estado del centro en ${perLabel(dm)}`,`<div class="flex gap-2 flex-wrap"><input type="month" class="inp" style="width:auto" aria-label="Mes del resumen" value="${dm}" onchange="dm=this.value||ym(today);render()"><button class="btn2" onclick="pers=!pers;render()">${pers?'Cerrar':'Personalizar'}</button></div>`)+panel+
+   (vis('stats')?`<div class="mb-6">${W.stats}</div>`:'')+(grid?`<div class="grid lg:grid-cols-2 gap-4">${grid}</div>`:(vis('stats')?'':empty('No hay bloques visibles. Activalos desde Personalizar.')));
+}
+
+/* ---------- Disciplinas ---------- */
+function vDisc(){
+  return head('Disciplinas','Actividades, cuotas y horarios',`<button class="btn" onclick="formDisc()">Agregar disciplina</button>`)+
+  `<div class="card scroll">${S.disc.length?`<table class="w-full"><thead><tr><th>Disciplina</th><th>Cuota mensual</th><th>Horarios (alumnos anotados)</th><th></th></tr></thead><tbody>${S.disc.map(d=>`<tr><td class="font-medium">${esc(d.nombre)}</td><td>${money(d.precio)}</td><td>${d.horarios.map(h=>`<span class="chip">${esc(h)} (${S.alumnos.filter(a=>a.insc.some(i=>i.d===d.id&&i.h===h)).length})</span>`).join('')||'<span style="color:var(--mute)">Sin horarios</span>'}</td><td class="text-right whitespace-nowrap"><button class="btn2" onclick="formDisc('${d.id}')">Editar</button> <button class="btn2" style="color:var(--bad)" onclick="delDisc('${d.id}')">Eliminar</button></td></tr>`).join('')}</tbody></table>`:empty('No hay disciplinas cargadas. Agregá una para poder inscribir alumnos.')}</div>`;
+}
+function formDisc(id){
+  const d=id?disc(id):{nombre:'',precio:15000,horarios:[]};
+  openModal(`<form onsubmit="return saveDisc(event,'${id||''}')"><h3 class="hd text-2xl font-bold mb-4">${id?'Editar disciplina':'Nueva disciplina'}</h3>
+  ${field('Nombre',`<input name="n" required class="inp" value="${esc(d.nombre)}" placeholder="Ej: Tenis">`)}
+  ${field('Cuota mensual (ARS)',`<input name="p" type="number" min="0" required class="inp" value="${d.precio}">`)}
+  ${field('Horarios (uno por línea)',`<textarea name="h" rows="4" class="inp" placeholder="Lun y mié 18:00&#10;Sáb 10:00">${esc(d.horarios.join('\n'))}</textarea>`)}${actions('Guardar disciplina')}</form>`);
+}
+function saveDisc(e,id){e.preventDefault();const f=new FormData(e.target),n=f.get('n').trim();
+  if(S.disc.some(d=>d.id!==id&&d.nombre.toLowerCase()===n.toLowerCase())){alert('Ya existe una disciplina con ese nombre.');return false}
+  const hs=f.get('h').split('\n').map(x=>x.trim()).filter(Boolean),data={nombre:n,precio:Number(f.get('p')),horarios:[...new Set(hs)]};
+  if(id){Object.assign(disc(id),data);S.alumnos.forEach(a=>a.insc.forEach(i=>{if(i.d===id&&i.h&&!data.horarios.includes(i.h))i.h=''}))}
+  else S.disc.push({id:uid(),...data});
+  save();closeModal();render();return false}
+function delDisc(id){const n=S.alumnos.filter(a=>a.insc.some(i=>i.d===id)).length;
+  if(!confirm(n?`Esta disciplina tiene ${n} alumno(s) inscripto(s). Se quitará de sus inscripciones. ¿Eliminar?`:'¿Eliminar esta disciplina?'))return;
+  S.disc=S.disc.filter(d=>d.id!==id);S.alumnos.forEach(a=>a.insc=a.insc.filter(i=>i.d!==id));S.pagos.forEach(p=>p.discs=(p.discs||[]).filter(x=>x!==id));save();render()}
+
+/* ---------- Alumnos ---------- */
+function vAlumnos(){
+  return head('Alumnos',`${S.alumnos.filter(activo).length} activos de ${S.alumnos.length}. El estado se calcula solo: inactivo si no tiene disciplinas o debe una cuota hace más de 30 días.`,`<button class="btn" onclick="formAlumno()">Agregar alumno</button>`)+
+  `<div class="card scroll">${S.alumnos.length?`<table class="w-full"><thead><tr><th>Nombre</th><th>Contacto</th><th>Disciplinas y horario</th><th>Estado</th><th></th></tr></thead><tbody>${S.alumnos.map(a=>`<tr><td class="font-medium">${esc(a.nombre)}</td><td>${esc(a.contacto)}</td><td>${a.insc.map(i=>disc(i.d)?`<span class="chip">${esc(disc(i.d).nombre)}${i.h?' · '+esc(i.h):''}</span>`:'').join('')||'<span style="color:var(--mute)">Sin disciplinas</span>'}</td><td>${activo(a)?'<span class="tag Pagado">Activo</span>':'<span class="tag Vencido">Inactivo</span>'}${deuda(a).length?' <span class="tag Porvencer">Debe cuota</span>':''}</td><td class="text-right whitespace-nowrap"><button class="btn2" onclick="formAlumno('${a.id}')">Editar</button> <button class="btn2" style="color:var(--bad)" onclick="delA('${a.id}')">Eliminar</button></td></tr>`).join('')}</tbody></table>`:empty('Todavía no hay alumnos. Registrá el primero con el botón de arriba.')}</div>`;
+}
+function formAlumno(id){
+  const a=id?alumno(id):{nombre:'',contacto:'',insc:[]};
+  const rows=S.disc.map(d=>{const i=a.insc.find(x=>x.d===d.id);return`<div class="mb-2"><label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="d" value="${d.id}" ${i?'checked':''}>${esc(d.nombre)} <span class="font-normal" style="color:var(--mute)">${money(d.precio)}</span></label>${d.horarios.length?`<select name="h_${d.id}" class="inp mt-1"><option value="">Elegir horario</option>${d.horarios.map(h=>`<option ${i&&i.h===h?'selected':''}>${esc(h)}</option>`).join('')}</select>`:'<div class="text-xs ml-6" style="color:var(--mute)">Sin horarios cargados</div>'}</div>`}).join('');
+  openModal(`<form onsubmit="return saveA(event,'${id||''}')"><h3 class="hd text-2xl font-bold mb-4">${id?'Editar alumno':'Nuevo alumno'}</h3>
+  ${field('Nombre completo',`<input name="n" required class="inp" value="${esc(a.nombre)}">`)}
+  ${field('Correo o teléfono',`<input name="c" required class="inp" value="${esc(a.contacto)}">`)}
+  <div class="text-sm font-medium mb-2">Disciplinas y horario</div>${rows||'<span class="text-sm" style="color:var(--mute)">Primero creá una disciplina.</span>'}
+  ${actions('Guardar alumno')}</form>`);
+}
+function saveA(e,id){e.preventDefault();const f=new FormData(e.target);
+  const data={nombre:f.get('n').trim(),contacto:f.get('c').trim(),insc:f.getAll('d').map(d=>({d,h:f.get('h_'+d)||''}))};
+  if(id)Object.assign(alumno(id),data);else S.alumnos.push({id:uid(),...data});
+  save();closeModal();render();return false}
+function delA(id){if(!confirm('Se eliminará el alumno y todos sus pagos. ¿Continuar?'))return;
+  S.alumnos=S.alumnos.filter(a=>a.id!==id);S.pagos=S.pagos.filter(p=>p.alumno!==id);save();render()}
+
+/* ---------- Pagos ---------- */
+function vPagos(){
+  const list=S.pagos.filter(p=>(!filt.estado||estado(p)===filt.estado)&&(!filt.periodo||p.periodo===filt.periodo))
+    .sort((a,b)=>b.periodo.localeCompare(a.periodo)||b.vence.localeCompare(a.vence));
+  const total=list.filter(p=>p.pagado).reduce((s,p)=>s+Number(p.monto),0);
+  const per=[...new Set(S.pagos.map(p=>p.periodo))].sort().reverse();
+  return head('Pagos','El estado se calcula solo según la fecha de vencimiento',`<button class="btn" onclick="formPago()">Registrar pago</button>`)+
+  `<div class="flex flex-wrap gap-3 mb-4 items-center">
+    <select class="inp" style="width:auto" aria-label="Estado" onchange="filt.estado=this.value;render()"><option value="">Todos los estados</option>${['Pagado','Pendiente','Por vencer','Vencido'].map(s=>`<option ${filt.estado===s?'selected':''}>${s}</option>`).join('')}</select>
+    <select class="inp" style="width:auto" aria-label="Período" onchange="filt.periodo=this.value;render()"><option value="">Todos los períodos</option>${per.map(p=>`<option value="${p}" ${filt.periodo===p?'selected':''}>${perLabel(p)}</option>`).join('')}</select>
+    <span class="text-sm" style="color:var(--mute)">Cobrado en esta vista: <b style="color:var(--ok)">${money(total)}</b></span></div>
+  <div class="card scroll">${list.length?`<table class="w-full"><thead><tr><th>Alumno</th><th>Período</th><th>Disciplinas</th><th>Monto</th><th>Vence</th><th>Pagado el</th><th>Estado</th><th></th></tr></thead><tbody>${list.map(p=>`<tr><td class="font-medium">${esc(alumno(p.alumno)?.nombre||'Alumno eliminado')}</td><td>${perLabel(p.periodo)}</td><td>${(p.discs||[]).map(i=>disc(i)?`<span class="chip">${esc(disc(i).nombre)}</span>`:'').join('')||'—'}</td><td>${money(p.monto)}</td><td>${fdate(p.vence)}</td><td>${fdate(p.fecha)}</td><td>${tag(estado(p))}</td><td class="text-right whitespace-nowrap">${p.pagado?'':`<button class="btn2" onclick="markPaid('${p.id}')">Marcar pagado</button> `}<button class="btn2" style="color:var(--bad)" onclick="delP('${p.id}')">Eliminar</button></td></tr>`).join('')}</tbody></table>`:empty('No hay pagos con estos filtros. Registrá uno nuevo o cambiá los filtros.')}</div>`;
+}
+function formPago(){
+  if(!S.alumnos.length){alert('Primero registrá al menos un alumno.');return}
+  openModal(`<form onsubmit="return addP(event)"><h3 class="hd text-2xl font-bold mb-4">Registrar pago</h3>
+  ${field('Alumno',`<select name="a" id="pa" class="inp" onchange="pDiscs()">${S.alumnos.map(a=>`<option value="${a.id}">${esc(a.nombre)}</option>`).join('')}</select>`)}
+  <div class="text-sm font-medium mb-1">Disciplinas que paga</div><div id="pd" class="mb-3"></div>
+  ${field('Monto total (ARS)','<input name="m" id="pm" type="number" min="0" required class="inp">')}
+  ${field('Período (mes)',`<input name="per" type="month" required class="inp" value="${ym(today)}" onchange="if(this.value)$('#pv').value=this.value+'-10'">`)}
+  ${field('Fecha de vencimiento',`<input name="v" id="pv" type="date" required class="inp" value="${ym(today)}-10">`)}
+  <label class="flex items-center gap-2 text-sm font-medium mb-2"><input type="checkbox" name="pg" onchange="$('#pfw').hidden=!this.checked">Ya fue pagado</label>
+  <div id="pfw" hidden>${field('Fecha de pago',`<input name="f" type="date" class="inp" value="${iso(today)}">`)}</div>
+  <p class="text-sm" style="color:var(--mute)">Si no está pagado, el estado (pendiente, por vencer o vencido) se calcula solo con la fecha de vencimiento.</p>
+  ${actions('Guardar pago')}</form>`);pDiscs();
+}
+function pDiscs(){const a=alumno($('#pa').value);
+  $('#pd').innerHTML=a.insc.length?a.insc.map(i=>{const d=disc(i.d);return d?`<label class="flex items-center gap-2 text-sm"><input type="checkbox" value="${d.id}" data-p="${d.precio}" checked onchange="pSum()">${esc(d.nombre)} · ${money(d.precio)}</label>`:''}).join(''):'<span class="text-sm" style="color:var(--mute)">Este alumno no tiene disciplinas. Escribí el monto a mano.</span>';pSum()}
+function pSum(){$('#pm').value=[...document.querySelectorAll('#pd input:checked')].reduce((s,x)=>s+Number(x.dataset.p),0)||''}
+function addP(e){e.preventDefault();const f=new FormData(e.target),pagado=f.get('pg')==='on';
+  S.pagos.push({id:uid(),alumno:f.get('a'),discs:[...document.querySelectorAll('#pd input:checked')].map(x=>x.value),monto:Number(f.get('m')),periodo:f.get('per'),vence:f.get('v'),pagado,fecha:pagado?(f.get('f')||iso(today)):''});
+  save();closeModal();render();return false}
+function markPaid(id){const p=S.pagos.find(x=>x.id===id);p.pagado=true;p.fecha=iso(today);save();render()}
+function delP(id){if(!confirm('¿Eliminar este registro de pago?'))return;S.pagos=S.pagos.filter(p=>p.id!==id);save();render()}
+
+/* ---------- Configuración ---------- */
+function vCfg(){tmpLogo=S.cfg.logo||'';
+  return head('Configuración','Nombre y logo de tu establecimiento')+
+  `<div class="card p-6 max-w-lg"><form onsubmit="return saveCfg(event)">
+  ${field('Nombre del establecimiento',`<input name="n" required class="inp" value="${esc(S.cfg.nombre)}">`)}
+  <div class="text-sm font-medium mb-2">Logo</div>
+  <div class="flex items-center gap-4 mb-2"><img id="lp" ${tmpLogo?`src="${tmpLogo}"`:'hidden'} alt="Logo" class="h-20 w-20 object-contain rounded" style="border:1px solid var(--line)"><div><input type="file" accept="image/*" onchange="logoUp(this)" class="text-sm"><button type="button" class="btn2 mt-2" onclick="tmpLogo='';$('#lp').hidden=true">Quitar logo</button></div></div>
+  <button class="btn mt-3">Guardar cambios</button><span id="cm" class="ml-3 text-sm" style="color:var(--ok)"></span></form></div>
+  <div class="card p-6 max-w-lg mt-4"><h3 class="hd text-2xl font-bold mb-1">Empezar de cero</h3><p class="text-sm mb-3" style="color:var(--mute)">Borra todos tus alumnos, disciplinas y pagos. Se conservan el nombre y el logo.</p><button class="btn2" style="color:var(--bad)" onclick="wipe()">Borrar todos los datos</button></div>`;
+}
+function logoUp(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,256/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(im.width*k));c.height=Math.max(1,Math.round(im.height*k));c.getContext('2d').drawImage(im,0,0,c.width,c.height);tmpLogo=c.toDataURL('image/png');$('#lp').src=tmpLogo;$('#lp').hidden=false};im.src=r.result};r.readAsDataURL(f)}
+function saveCfg(e){e.preventDefault();S.cfg.nombre=new FormData(e.target).get('n').trim()||DEF;S.cfg.logo=tmpLogo;save();brand();$('#cm').textContent='Cambios guardados'+(S.cfg.logo?'':'');return false}
+function wipe(){if(!confirm('Se borrarán todos los alumnos, disciplinas y pagos. ¿Continuar?'))return;S={cfg:S.cfg,disc:[],alumnos:[],pagos:[]};save();view='dash';render()}
+
+initFB();
+</script>
+</body>
+</html>
