@@ -15,19 +15,23 @@ body{background:var(--bg);color:var(--ink);font-family:'Barlow',system-ui,sans-s
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
 .inp{width:100%;border:1px solid var(--line);border-radius:6px;padding:.5rem .65rem;background:#fff;color:var(--ink)}
 .inp:focus,.btn:focus-visible,.nav:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
-.btn{background:var(--acc);color:#fff;border-radius:6px;padding:.5rem .9rem;font-weight:600}
+.btn{background:var(--acc);color:var(--accink,#fff);border-radius:6px;padding:.5rem .9rem;font-weight:600}
 .btn:hover{filter:brightness(.92)}
 .btn2{border:1px solid var(--line);border-radius:6px;padding:.35rem .7rem;font-size:.85rem;background:#fff}
 .btn2:hover{background:#f3f7f6}
-.nav{display:block;width:100%;text-align:left;padding:.55rem .9rem;border-radius:6px;color:#bcd3d8;font-weight:500;white-space:nowrap}
-.nav:hover{background:rgba(255,255,255,.08)}
-.nav.on{background:#fff;color:var(--side)}
+.nav{display:block;width:100%;text-align:left;padding:.55rem .9rem;border-radius:6px;color:var(--sidemut,#bcd3d8);font-weight:500;white-space:nowrap}
+.nav:hover{background:color-mix(in srgb,var(--sideink,#fff) 12%,transparent)}
+.nav.on{background:var(--sideink,#fff);color:var(--side)}
 .tag{display:inline-block;padding:.1rem .55rem;border-radius:99px;font-size:.78rem;font-weight:600}
 .Pagado{background:#dcf5e5;color:var(--ok)}.Pendiente{background:#e6edf0;color:#3d5560}.Porvencer{background:#fdeccd;color:var(--warn)}.Vencido{background:#fde0dd;color:var(--bad)}
-.chip{background:#e3f1f2;color:#0b5d65;border-radius:99px;padding:.1rem .55rem;font-size:.78rem;margin:.1rem .15rem .1rem 0;display:inline-block}
+.chip{background:color-mix(in srgb,var(--acc) 14%,#fff);color:color-mix(in srgb,var(--acc) 65%,#000);border-radius:99px;padding:.1rem .55rem;font-size:.78rem;margin:.1rem .15rem .1rem 0;display:inline-block}
 th{text-align:left;font-weight:600;color:var(--mute);font-size:.85rem;padding:.6rem .8rem;border-bottom:1px solid var(--line)}
 td{padding:.65rem .8rem;border-bottom:1px solid var(--line);vertical-align:top}
 .scroll{overflow-x:auto}
+@media(max-width:767px){
+#nav{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--side);display:flex;gap:.15rem;padding:.3rem .3rem calc(.3rem + env(safe-area-inset-bottom,0px));box-shadow:0 -2px 8px rgba(0,0,0,.18)}
+#nav .nav{flex:1;text-align:center;font-size:.72rem;padding:.6rem .1rem}
+#out{width:auto;padding:.4rem .75rem}}
 </style>
 </head>
 <body>
@@ -55,20 +59,20 @@ td{padding:.65rem .8rem;border-bottom:1px solid var(--line);vertical-align:top}
 
 <!-- APP -->
 <div id="app" class="min-h-screen flex flex-col md:flex-row" hidden>
-  <aside class="md:w-56 md:min-h-screen p-3 md:p-4 flex md:flex-col gap-2 items-center md:items-stretch" style="background:var(--side)">
-    <div id="sbrand" class="flex items-center gap-2 md:mb-4 px-2"></div>
+  <aside class="sticky top-0 z-20 md:static justify-between md:justify-start md:w-56 md:min-h-screen p-3 md:p-4 flex md:flex-col gap-2 items-center md:items-stretch" style="background:var(--side);top:env(safe-area-inset-top,0px)">
+    <div id="sbrand" class="flex items-center gap-2 md:mb-4 px-2 min-w-0"></div>
     <nav class="flex md:flex-col gap-1 flex-1 md:flex-none scroll" id="nav"></nav>
-    <span id="sv" class="hidden md:block text-xs px-2 md:mt-auto" style="color:#8fb3bb"></span>
-    <button id="out" class="nav md:mt-1 w-auto md:w-full" style="color:#f4b8b0">Cerrar sesión</button>
+    <span id="sv" class="hidden md:block text-xs px-2 md:mt-auto" style="color:var(--sidemut,#8fb3bb)"></span>
+    <button id="out" class="nav md:mt-1 w-auto md:w-full" style="color:var(--outc,#f4b8b0)"><span class="md:hidden">Salir</span><span class="hidden md:inline">Cerrar sesión</span></button>
   </aside>
-  <main class="flex-1 p-4 md:p-8 min-w-0">
+  <main class="flex-1 p-4 pb-24 md:p-8 min-w-0">
     <div id="banner" class="mb-4 text-sm rounded-md p-3" style="background:#fdeccd;color:#8a5a00" hidden></div>
     <div id="view"></div>
   </main>
 </div>
 
 <!-- MODAL -->
-<div id="modal" class="fixed inset-0 flex items-center justify-center p-4" style="background:rgba(10,30,36,.55)" hidden>
+<div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(10,30,36,.55)" hidden>
   <div class="card w-full max-w-md p-6 max-h-full overflow-y-auto" id="mbox"></div>
 </div>
 
@@ -91,7 +95,7 @@ const FIREBASE_CONFIG = {
 };
 const PRODUCTO = "Gestión Centro Deportivo";
 const CONTACTO = "3865859130";
-const TRIAL = 7;
+const TRIAL = 14;
 const DEF = "Mi Centro Deportivo";
 let S=null,uidCur=null,saveT=null,sent={};
 const setStat=t=>{const e=$('#sv');if(e)e.textContent=t};
@@ -123,10 +127,10 @@ const activo=a=>a.insc.length>0&&!deuda(a).some(p=>dias(p.vence)<-30);
 
 /* ---------- marca ---------- */
 function brand(){
-  $('#lbrand').innerHTML=`<span class="hd text-4xl font-bold" style="color:var(--side)">${esc(PRODUCTO)}</span>`;
-  if(!S){document.title=PRODUCTO;return}
+  $('#lbrand').innerHTML=`<span class="hd text-4xl font-bold" style="color:var(--ink)">${esc(PRODUCTO)}</span>`;
+  applyTheme();if(!S){document.title=PRODUCTO;return}
   const n=esc(S.cfg.nombre),l=S.cfg.logo?`<img src="${S.cfg.logo}" alt="" class="h-10 w-10 object-contain rounded bg-white p-0.5">`:'';
-  $('#sbrand').innerHTML=l+`<span class="hd text-2xl font-bold text-white hidden md:inline">${n}</span>`;
+  $('#sbrand').innerHTML=l+`<span class="hd text-2xl font-bold truncate" style="color:var(--sideink,#fff)">${n}</span>`;
   document.title=S.cfg.nombre+' · Gestión';
 }
 
@@ -226,7 +230,7 @@ function dash(){
   const max=Math.max(1,...S.disc.map(d=>S.alumnos.filter(a=>a.insc.some(i=>i.d===d.id)).length));
   const rec=[...S.pagos].sort((a,b)=>(b.fecha||b.vence).localeCompare(a.fecha||a.vence)).slice(0,5);
   const W={
-   stats:`<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">${stat('Alumnos activos',act,'var(--side)',`de ${S.alumnos.length} registrados`)}${stat('Ingresos del mes',money(ing),'var(--ok)','según fecha de pago')}${stat('Pagos pendientes',pend.length,'var(--warn)',`${pv} por vencer · ${money(sm(pend))}`)}${stat('Pagos vencidos',venc.length,'var(--bad)',money(sm(venc))+' sin cobrar')}</div>`,
+   stats:`<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">${stat('Alumnos activos',act,'var(--ink)',`de ${S.alumnos.length} registrados`)}${stat('Ingresos del mes',money(ing),'var(--ok)','según fecha de pago')}${stat('Pagos pendientes',pend.length,'var(--warn)',`${pv} por vencer · ${money(sm(pend))}`)}${stat('Pagos vencidos',venc.length,'var(--bad)',money(sm(venc))+' sin cobrar')}</div>`,
    ing:box('Ingresos por mes',`Últimos 6 meses · total ${money(sm(keys.flatMap(paid)))}`,bars(serI,lab,'var(--acc)')),
    cnt:box('Cantidad de pagos por mes',`Pagos cobrados · total ${serC.reduce((a,b)=>a+b,0)}`,bars(serC,lab,'#e08a2e')),
    est:box('Estado de los pagos','Todos los pagos registrados',S.pagos.length?ests.map((e,i)=>`<div class="mb-2"><div class="flex justify-between text-sm">${tag(e)}<b>${ec[i]}</b></div>${meter(ec[i],S.pagos.length)}</div>`).join(''):empty('Aún no se registraron pagos.')),
@@ -318,8 +322,40 @@ function markPaid(id){const p=S.pagos.find(x=>x.id===id);p.pagado=true;p.fecha=i
 function delP(id){if(!confirm('¿Eliminar este registro de pago?'))return;S.pagos=S.pagos.filter(p=>p.id!==id);save();render()}
 
 /* ---------- Configuración ---------- */
-function vCfg(){tmpLogo=S.cfg.logo||'';
-  return head('Configuración','Nombre y logo de tu establecimiento')+
+/* ---------- apariencia ---------- */
+const DEFT={acc:'#0e7c86',side:'#0f3441',velo:85};
+const PRE=[['Turquesa','#0e7c86','#0f3441'],['Azul','#2563eb','#14213d'],['Verde cancha','#15803d','#14352a'],['Naranja','#ea580c','#3a2417'],['Violeta','#7c3aed','#2e1a47'],['Rojo y negro','#dc2626','#1c1c1f'],['Rosa','#db2777','#3b1230'],['Claro','#0e7c86','#dfe9e8']];
+function lum(h){const n=parseInt(h.slice(1),16);const c=[n>>16,(n>>8)&255,n&255].map(v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)});return .2126*c[0]+.7152*c[1]+.0722*c[2]}
+function applyTheme(){
+  const t={...DEFT,...((S&&S.cfg.tema)||{})},r=document.documentElement.style,light=lum(t.side)>.4;
+  r.setProperty('--acc',t.acc);r.setProperty('--side',t.side);
+  r.setProperty('--accink',lum(t.acc)>.4?'#14272e':'#fff');
+  r.setProperty('--sideink',light?'#14272e':'#fff');
+  r.setProperty('--sidemut',light?'#3d5560':'#bcd3d8');
+  r.setProperty('--outc',light?'#b42318':'#f4b8b0');
+  const m=document.querySelector('#app main'),f=S&&S.cfg.fondo,v=t.velo/100;
+  if(m){m.style.backgroundImage=f?`linear-gradient(rgba(238,242,241,${v}),rgba(238,242,241,${v})),url(${f})`:'';m.style.backgroundSize='cover';m.style.backgroundPosition='center'}
+}
+function setTema(o){S.cfg.tema={...DEFT,...(S.cfg.tema||{}),...o};applyTheme();save()}
+function preset(i){setTema({acc:PRE[i][1],side:PRE[i][2]});$('#ca').value=PRE[i][1];$('#cs').value=PRE[i][2]}
+function resetTema(){delete S.cfg.tema;applyTheme();save();render()}
+function imgData(file,max,type,q,lim){return new Promise((ok,no)=>{const r=new FileReader();r.onerror=no;r.onload=()=>{const im=new Image();im.onerror=no;im.onload=()=>{let k=Math.min(1,max/Math.max(im.width,im.height)),qq=q,out='';for(let i=0;i<6;i++){const c=document.createElement('canvas');c.width=Math.max(1,Math.round(im.width*k));c.height=Math.max(1,Math.round(im.height*k));const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);out=c.toDataURL(type,qq);if(out.length<=lim)break;k*=.8;qq=Math.max(.35,qq-.08)}ok(out)};im.src=r.result};r.readAsDataURL(file)})}
+async function fondoUp(inp){const f=inp.files[0];if(!f)return;try{const u=await imgData(f,1100,'image/jpeg',.6,160000);S.cfg.fondo=u;$('#fp').src=u;$('#fp').hidden=false;applyTheme();save()}catch(e){alert('No se pudo cargar la imagen. Probá con otra.')}}
+function quitaFondo(){S.cfg.fondo='';$('#fp').hidden=true;applyTheme();save()}
+function vApar(){const t={...DEFT,...(S.cfg.tema||{})};
+  return `<div class="card p-6 max-w-lg mt-4"><h3 class="hd text-2xl font-bold mb-1">Apariencia</h3>
+  <p class="text-sm mb-3" style="color:var(--mute)">Elegí una combinación de colores o armá la tuya. Los cambios se guardan solos.</p>
+  <div class="flex flex-wrap gap-2 mb-4">${PRE.map((p,i)=>`<button type="button" class="btn2 flex items-center gap-2" onclick="preset(${i})"><span class="flex"><span class="inline-block h-5 w-5 rounded-full" style="background:${p[1]};border:1px solid var(--line)"></span><span class="inline-block h-5 w-5 rounded-full -ml-2" style="background:${p[2]};border:1px solid var(--line)"></span></span>${p[0]}</button>`).join('')}</div>
+  <div class="grid grid-cols-2 gap-3 mb-4">
+    <label class="text-sm font-medium">Color principal<input id="ca" type="color" class="block mt-1 h-10 w-full cursor-pointer" value="${t.acc}" oninput="setTema({acc:this.value})"></label>
+    <label class="text-sm font-medium">Color del menú<input id="cs" type="color" class="block mt-1 h-10 w-full cursor-pointer" value="${t.side}" oninput="setTema({side:this.value})"></label></div>
+  <div class="text-sm font-medium mb-2">Imagen de fondo</div>
+  <div class="flex items-center gap-4 mb-3"><img id="fp" ${S.cfg.fondo?`src="${S.cfg.fondo}"`:'hidden'} alt="Fondo" class="h-16 w-24 object-cover rounded" style="border:1px solid var(--line)"><div><input type="file" accept="image/*" onchange="fondoUp(this)" class="text-sm"><button type="button" class="btn2 mt-2" onclick="quitaFondo()">Quitar fondo</button></div></div>
+  <label class="block text-sm font-medium">Opacidad del velo sobre el fondo<input type="range" min="40" max="95" value="${t.velo}" class="w-full" oninput="setTema({velo:+this.value})"><span class="text-xs font-normal" style="color:var(--mute)">Más alto = fondo más suave y texto más fácil de leer.</span></label>
+  <button type="button" class="btn2 mt-4" onclick="resetTema()">Restablecer colores</button></div>`}
+function vCfg(){const h=vCfg0(),k='<div class="card p-6 max-w-lg mt-4"><h3 class="hd text-2xl font-bold mb-1">Empezar de cero';const i=h.indexOf(k);return i<0?h+vApar():h.slice(0,i)+vApar()+h.slice(i)}
+function vCfg0(){tmpLogo=S.cfg.logo||'';
+  return head('Configuración','Nombre, logo y apariencia de tu establecimiento')+
   `<div class="card p-6 max-w-lg"><form onsubmit="return saveCfg(event)">
   ${field('Nombre del establecimiento',`<input name="n" required class="inp" value="${esc(S.cfg.nombre)}">`)}
   <div class="text-sm font-medium mb-2">Logo</div>
