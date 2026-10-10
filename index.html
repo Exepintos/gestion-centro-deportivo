@@ -81,7 +81,7 @@ const today=new Date(), ym=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStar
 const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const perLabel=p=>{if(!p)return'—';const[y,m]=p.split('-');const t=new Date(y,m-1,1).toLocaleDateString('es',{month:'long',year:'numeric'});return t[0].toUpperCase()+t.slice(1)};
 const fdate=f=>f?new Date(f+'T12:00:00').toLocaleDateString('es-AR'):'—';
-const firebaseConfig = {
+const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBZV9jIqr0NPl9gF-zCNXL-iNKTfkINFkA",
   authDomain: "gestion-centro-deportivo-6994d.firebaseapp.com",
   projectId: "gestion-centro-deportivo-6994d",
@@ -89,6 +89,8 @@ const firebaseConfig = {
   messagingSenderId: "350629624182",
   appId: "1:350629624182:web:f8b311d4c01e9e05712257"
 };
+const PRODUCTO = "Gestión Centro Deportivo";
+const CONTACTO = "3865859130"; 
 const PRODUCTO='Gestión Centro Deportiv',CONTACTO='Contacto: 3865859130',TRIAL=14,DEF='Mi Centro Deportivo';
 let S=null,uidCur=null,saveT=null,sent={};
 const setStat=t=>{const e=$('#sv');if(e)e.textContent=t};
