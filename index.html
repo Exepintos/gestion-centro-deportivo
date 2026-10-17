@@ -30,6 +30,7 @@ td{padding:.65rem .8rem;border-bottom:1px solid var(--line);vertical-align:top}
 .scroll{overflow-x:auto}
 .al{display:block;width:100%;text-align:left;border-radius:8px;padding:.5rem .75rem;margin-bottom:.35rem;font-size:.9rem;font-weight:500}
 .al.warn{background:#fdeccd;color:#8a5a00}.al.bad{background:#fde0dd;color:var(--bad)}
+.al.rojo{background:#fde0dd;color:#9b1c13;border-left:4px solid #dc2626}.al.naranja{background:#ffe6d0;color:#9a4a0a;border-left:4px solid #f97316}.al.amarillo{background:#fff7c7;color:#6e5600;border-left:4px solid #eab308}
 @media(max-width:767px){
 #nav{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--side);display:flex;gap:.15rem;padding:.3rem .3rem calc(.3rem + env(safe-area-inset-bottom,0px));box-shadow:0 -2px 8px rgba(0,0,0,.18)}
 #nav .nav{flex:1;text-align:center;font-size:.72rem;padding:.6rem .1rem}
@@ -208,7 +209,7 @@ function render(){
 const head=(t,sub,btn)=>`<div class="flex flex-wrap items-end justify-between gap-3 mb-6"><div><h2 class="hd text-4xl font-bold">${t}</h2><p style="color:var(--mute)">${sub}</p></div>${btn||''}</div>`;
 const empty=t=>`<div class="p-8 text-center" style="color:var(--mute)">${t}</div>`;
 
-const WID=[['stats','Tarjetas de resumen'],['ing','Ingresos por mes'],['cnt','Cantidad de pagos por mes'],['est','Estado de los pagos'],['deu','Alumnos con deuda'],['dis','Alumnos por disciplina'],['rec','Últimos movimientos']];
+const WID=[['stats','Tarjetas de resumen'],['ing','Ingresos por mes'],['cnt','Cantidad de pagos por mes'],['est','Estado de los alumnos'],['deu','Alumnos con deuda'],['dis','Alumnos por disciplina'],['rec','Últimos movimientos']];
 const vis=k=>(S.cfg.vis||{})[k]!==false;
 let pers=false;
 function toggleVis(k,on){S.cfg.vis=S.cfg.vis||{};S.cfg.vis[k]=on;save();render()}
@@ -218,26 +219,24 @@ const box=(t,sub,body)=>`<div class="card p-5"><h3 class="hd text-2xl font-bold"
 const meter=(n,tot)=>`<div class="h-2 rounded-full mt-1" style="background:#e3ecea"><div class="h-2 rounded-full" style="width:${n/Math.max(1,tot)*100}%;background:var(--acc)"></div></div>`;
 
 function dash(){
-  const act=S.alumnos.filter(activo).length;
-  const paid=k=>S.pagos.filter(p=>p.pagado&&(p.fecha||'').startsWith(k));
-  const sm=l=>l.reduce((s,p)=>s+Number(p.monto),0);
-  const ing=sm(paid(dm));
-  const sin=S.pagos.filter(p=>!p.pagado);
-  const pend=sin.filter(p=>estado(p)!=='Vencido'),venc=sin.filter(p=>estado(p)==='Vencido'),pv=pend.filter(p=>estado(p)==='Por vencer').length;
+  const ST=S.alumnos.map(a=>({a,...estA(a)}));
+  const paid=k=>S.pagos.filter(p=>p.pagado&&(p.fecha||'').startsWith(k)),sm=l=>l.reduce((t,p)=>t+Number(p.monto),0);
+  const ing=sm(paid(dm)),act=ST.filter(x=>x.k!=='Inactivo').length;
+  const pv=ST.filter(x=>x.pv),dv=ST.filter(x=>x.k==='Debe cuota'),ia=ST.filter(x=>x.k==='Inactivo'),ok=ST.filter(x=>x.k==='Activo'&&!x.pv);
+  const owe=l=>money(l.reduce((t,x)=>t+cuotaDe(x.a),0));
   const stat=(l,v,c,sub)=>`<div class="card p-5"><div class="text-sm" style="color:var(--mute)">${l}</div><div class="hd text-5xl font-bold mt-1" style="color:${c}">${v}</div><div class="text-sm" style="color:var(--mute)">${sub}</div></div>`;
   const [y,m]=dm.split('-').map(Number),mk=[...Array(6)].map((_,i)=>new Date(y,m-1-(5-i),1));
   const keys=mk.map(ym),lab=mk.map(d=>d.toLocaleDateString('es',{month:'short'}).replace('.','')),serI=keys.map(k=>sm(paid(k))),serC=keys.map(k=>paid(k).length);
-  const ests=['Pagado','Pendiente','Por vencer','Vencido'],ec=ests.map(e=>S.pagos.filter(p=>estado(p)===e).length);
-  const dd={};venc.forEach(p=>{const a=alumno(p.alumno);if(!a)return;const o=dd[a.id]=dd[a.id]||{n:a.nombre,t:0,c:0};o.t+=Number(p.monto);o.c++});
-  const deu=Object.values(dd).sort((a,b)=>b.t-a.t).slice(0,5);
+  const es=[['Al día','Pagado',ok.length],['Por vencer','Porvencer',pv.length],['Debe cuota','Vencido',dv.length],['Inactivos','Pendiente',ia.length]];
+  const deu=[...dv].sort((a,b)=>b.late-a.late).slice(0,5);
   const max=Math.max(1,...S.disc.map(d=>S.alumnos.filter(a=>a.insc.some(i=>i.d===d.id)).length));
   const rec=[...S.pagos].sort((a,b)=>(b.fecha||b.vence).localeCompare(a.fecha||a.vence)).slice(0,5);
   const W={
-   stats:`<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">${stat('Alumnos activos',act,'var(--ink)',`de ${S.alumnos.length} registrados`)}${stat('Ingresos del mes',money(ing),'var(--ok)','según fecha de pago')}${stat('Pagos pendientes',pend.length,'var(--warn)',`${pv} por vencer · ${money(sm(pend))}`)}${stat('Pagos vencidos',venc.length,'var(--bad)',money(sm(venc))+' sin cobrar')}</div>`,
+   stats:`<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">${stat('Alumnos activos',act,'var(--ink)',`${ia.length} inactivos · ${ST.length} en total`)}${stat('Ingresos del mes',money(ing),'var(--ok)','según fecha de pago')}${stat('Cuotas por vencer',pv.length,'#a16207',`en ${cfgA().pv.dias} días o menos · ≈ ${owe(pv)}`)}${stat('Alumnos con deuda',dv.length,'var(--bad)',`≈ ${owe(dv)} sin cobrar`)}</div>`,
    ing:box('Ingresos por mes',`Últimos 6 meses · total ${money(sm(keys.flatMap(paid)))}`,bars(serI,lab,'var(--acc)')),
    cnt:box('Cantidad de pagos por mes',`Pagos cobrados · total ${serC.reduce((a,b)=>a+b,0)}`,bars(serC,lab,'#e08a2e')),
-   est:box('Estado de los pagos','Todos los pagos registrados',S.pagos.length?ests.map((e,i)=>`<div class="mb-2"><div class="flex justify-between text-sm">${tag(e)}<b>${ec[i]}</b></div>${meter(ec[i],S.pagos.length)}</div>`).join(''):empty('Aún no se registraron pagos.')),
-   deu:box('Alumnos con deuda','Cuotas vencidas sin cobrar',deu.length?deu.map(o=>`<div class="flex justify-between py-2 border-b" style="border-color:var(--line)"><span class="font-medium">${esc(o.n)} <span class="text-sm font-normal" style="color:var(--mute)">${o.c} cuota${o.c>1?'s':''}</span></span><b style="color:var(--bad)">${money(o.t)}</b></div>`).join(''):empty('Nadie tiene cuotas vencidas.')),
+   est:box('Estado de los alumnos','Según su próximo vencimiento',ST.length?es.map(([l,c,n])=>`<div class="mb-2"><div class="flex justify-between text-sm"><span class="tag ${c}">${l}</span><b>${n}</b></div>${meter(n,ST.length)}</div>`).join(''):empty('Aún no hay alumnos.')),
+   deu:box('Alumnos con deuda','Los que llevan más días sin pagar',deu.length?deu.map(x=>`<div class="flex justify-between py-2 border-b" style="border-color:var(--line)"><span class="font-medium">${esc(x.a.nombre)}</span><b style="color:var(--bad)">${x.late} ${x.late===1?'día':'días'}</b></div>`).join(''):empty('Nadie tiene la cuota vencida.')),
    dis:box('Alumnos por disciplina','Inscripciones actuales',S.disc.length?S.disc.map(d=>{const n=S.alumnos.filter(a=>a.insc.some(i=>i.d===d.id)).length;return`<div class="mb-3"><div class="flex justify-between text-sm"><span>${esc(d.nombre)}</span><b>${n}</b></div>${meter(n,max)}</div>`}).join(''):empty('Todavía no hay disciplinas. Agregá la primera en Disciplinas.')),
    rec:box('Últimos movimientos','Los 5 más recientes',rec.length?rec.map(p=>`<div class="flex justify-between items-center py-2 border-b" style="border-color:var(--line)"><div><div class="font-medium">${esc(alumno(p.alumno)?.nombre||'Alumno eliminado')}</div><div class="text-sm" style="color:var(--mute)">${perLabel(p.periodo)}</div></div><div class="text-right"><div>${money(p.monto)}</div>${tag(estado(p))}</div></div>`).join(''):empty('Aún no se registraron pagos.'))};
   const grid=['ing','cnt','est','deu','dis','rec'].filter(vis).map(k=>W[k]).join('');
@@ -270,8 +269,10 @@ function delDisc(id){const n=S.alumnos.filter(a=>a.insc.some(i=>i.d===id)).lengt
 
 /* ---------- Alumnos ---------- */
 function vAlumnos(){
-  return head('Alumnos',`${S.alumnos.filter(activo).length} activos de ${S.alumnos.length}. El estado se calcula solo: inactivo si no tiene disciplinas o debe una cuota hace más de 30 días.`,`<button class="btn" onclick="formAlumno()">Agregar alumno</button>`)+
-  `<div class="card scroll">${S.alumnos.length?`<table class="w-full"><thead><tr><th>Nombre</th><th>Contacto</th><th>Disciplinas y horario</th><th>Estado</th><th></th></tr></thead><tbody>${S.alumnos.map(a=>`<tr><td class="font-medium">${esc(a.nombre)}</td><td>${esc(a.contacto)}</td><td>${a.insc.map(i=>disc(i.d)?`<span class="chip">${esc(disc(i.d).nombre)}${i.h?' · '+esc(i.h):''}</span>`:'').join('')||'<span style="color:var(--mute)">Sin disciplinas</span>'}</td><td>${activo(a)?'<span class="tag Pagado">Activo</span>':'<span class="tag Vencido">Inactivo</span>'}${deuda(a).length?' <span class="tag Porvencer">Debe cuota</span>':''}</td><td class="text-right whitespace-nowrap"><button class="btn2" onclick="formAlumno('${a.id}')">Editar</button> <button class="btn2" style="color:var(--bad)" onclick="delA('${a.id}')">Eliminar</button></td></tr>`).join('')}</tbody></table>`:empty('Todavía no hay alumnos. Registrá el primero con el botón de arriba.')}</div>`;
+  const ST=S.alumnos.map(a=>({a,...estA(a)})),list=ST.filter(x=>!filtA||x.k===filtA);
+  return head('Alumnos',`${ST.filter(x=>x.k!=='Inactivo').length} activos de ${ST.length}. Las reglas de estado se configuran en Configuración.`,`<button class="btn" onclick="formAlumno()">Agregar alumno</button>`)+
+  `<div class="mb-4"><select class="inp" style="width:auto" aria-label="Estado" onchange="filtA=this.value;render()"><option value="">Todos los estados</option>${['Activo','Debe cuota','Inactivo'].map(e=>`<option ${filtA===e?'selected':''}>${e}</option>`).join('')}</select></div>`+
+  `<div class="card scroll">${list.length?`<table class="w-full"><thead><tr><th>Nombre</th><th>Contacto</th><th>Disciplinas y horario</th><th>Estado</th><th></th></tr></thead><tbody>${list.map(x=>{const a=x.a;return`<tr><td class="font-medium">${esc(a.nombre)}</td><td>${esc(a.contacto)}</td><td>${a.insc.map(i=>disc(i.d)?`<span class="chip">${esc(disc(i.d).nombre)}${i.h?' · '+esc(i.h):''}</span>`:'').join('')||'<span style="color:var(--mute)">Sin disciplinas</span>'}</td><td>${estTag(x)}<div class="text-xs mt-1" style="color:${x.pv?'var(--warn)':'var(--mute)'}">${estSub(x)}</div></td><td class="text-right whitespace-nowrap"><button class="btn2" onclick="formAlumno('${a.id}')">Editar</button> <button class="btn2" style="color:var(--bad)" onclick="delA('${a.id}')">Eliminar</button></td></tr>`}).join('')}</tbody></table>`:empty(S.alumnos.length?'No hay alumnos con ese estado.':'Todavía no hay alumnos. Registrá el primero con el botón de arriba.')}</div>`;
 }
 function formAlumno(id){
   const a=id?alumno(id):{nombre:'',contacto:'',insc:[]};
@@ -284,7 +285,7 @@ function formAlumno(id){
 }
 function saveA(e,id){e.preventDefault();const f=new FormData(e.target);
   const data={nombre:f.get('n').trim(),contacto:f.get('c').trim(),insc:f.getAll('d').map(d=>({d,h:f.get('h_'+d)||''}))};
-  if(id)Object.assign(alumno(id),data);else S.alumnos.push({id:uid(),...data});
+  if(id)Object.assign(alumno(id),data);else S.alumnos.push({id:uid(),alta:iso(today),...data});
   save();closeModal();render();return false}
 function delA(id){if(!confirm('Se eliminará el alumno y todos sus pagos. ¿Continuar?'))return;
   S.alumnos=S.alumnos.filter(a=>a.id!==id);S.pagos=S.pagos.filter(p=>p.alumno!==id);save();render()}
@@ -295,41 +296,50 @@ function vPagos(){
     .sort((a,b)=>b.periodo.localeCompare(a.periodo)||b.vence.localeCompare(a.vence));
   const total=list.filter(p=>p.pagado).reduce((s,p)=>s+Number(p.monto),0);
   const per=[...new Set(S.pagos.map(p=>p.periodo))].sort().reverse();
-  return head('Pagos','El estado se calcula solo según la fecha de vencimiento',`<button class="btn" onclick="formPago()">Registrar pago</button>`)+
+  return head('Pagos','Registrá cada cobro con su fecha: el próximo vencimiento se calcula solo',`<button class="btn" onclick="formPago()">Registrar pago</button>`)+
   `<div class="flex flex-wrap gap-3 mb-4 items-center">
     <select class="inp" style="width:auto" aria-label="Estado" onchange="filt.estado=this.value;render()"><option value="">Todos los estados</option>${['Pagado','Pendiente','Por vencer','Vencido'].map(s=>`<option ${filt.estado===s?'selected':''}>${s}</option>`).join('')}</select>
     <select class="inp" style="width:auto" aria-label="Período" onchange="filt.periodo=this.value;render()"><option value="">Todos los períodos</option>${per.map(p=>`<option value="${p}" ${filt.periodo===p?'selected':''}>${perLabel(p)}</option>`).join('')}</select>
     <span class="text-sm" style="color:var(--mute)">Cobrado en esta vista: <b style="color:var(--ok)">${money(total)}</b></span></div>
-  <div class="card scroll">${list.length?`<table class="w-full"><thead><tr><th>Alumno</th><th>Período</th><th>Disciplinas</th><th>Monto</th><th>Vence</th><th>Pagado el</th><th>Estado</th><th></th></tr></thead><tbody>${list.map(p=>`<tr><td class="font-medium">${esc(alumno(p.alumno)?.nombre||'Alumno eliminado')}</td><td>${perLabel(p.periodo)}</td><td>${(p.discs||[]).map(i=>disc(i)?`<span class="chip">${esc(disc(i).nombre)}</span>`:'').join('')||'—'}</td><td>${money(p.monto)}${p.recargo?`<div class="text-xs" style="color:var(--warn)">incluye recargo ${money(p.recargo)}</div>`:''}</td><td>${fdate(p.vence)}</td><td>${fdate(p.fecha)}</td><td>${tag(estado(p))}</td><td class="text-right whitespace-nowrap">${p.pagado?'':`<button class="btn2" onclick="markPaid('${p.id}')">Marcar pagado</button> `}<button class="btn2" style="color:var(--bad)" onclick="delP('${p.id}')">Eliminar</button></td></tr>`).join('')}</tbody></table>`:empty('No hay pagos con estos filtros. Registrá uno nuevo o cambiá los filtros.')}</div>`;
+  <div class="card scroll">${list.length?`<table class="w-full"><thead><tr><th>Alumno</th><th>Período</th><th>Disciplinas</th><th>Monto</th><th>Próx. venc.</th><th>Pagado el</th><th>Estado</th><th></th></tr></thead><tbody>${list.map(p=>`<tr><td class="font-medium">${esc(alumno(p.alumno)?.nombre||'Alumno eliminado')}</td><td>${perLabel(p.periodo)}</td><td>${(p.discs||[]).map(i=>disc(i)?`<span class="chip">${esc(disc(i).nombre)}</span>`:'').join('')||'—'}</td><td>${money(p.monto)}${p.recargo?`<div class="text-xs" style="color:var(--warn)">incluye recargo ${money(p.recargo)}</div>`:''}</td><td>${fdate(p.vence)}</td><td>${fdate(p.fecha)}</td><td>${tag(estado(p))}</td><td class="text-right whitespace-nowrap">${p.pagado?'':`<button class="btn2" onclick="markPaid('${p.id}')">Marcar pagado</button> `}<button class="btn2" onclick="formPago('${p.id}')">Editar</button> <button class="btn2" style="color:var(--bad)" onclick="delP('${p.id}')">Eliminar</button></td></tr>`).join('')}</tbody></table>`:empty('No hay pagos con estos filtros. Registrá uno nuevo o cambiá los filtros.')}</div>`;
 }
-function formPago(){
+let pAuto=true,pEdit=null;
+function formPago(id){
   if(!S.alumnos.length){alert('Primero registrá al menos un alumno.');return}
   if(!S.disc.length){alert('Primero creá al menos una disciplina.');return}
-  openModal(`<form onsubmit="return addP(event)"><h3 class="hd text-2xl font-bold mb-4">Registrar pago</h3>
-  ${field('Alumno',`<select name="a" id="pa" class="inp" onchange="pDiscs()">${S.alumnos.map(a=>`<option value="${a.id}">${esc(a.nombre)}</option>`).join('')}</select>`)}
+  const p=id?S.pagos.find(x=>x.id===id):null,f0=iso(today),legacy=p&&!p.pagado;pEdit=p;pAuto=!p;
+  openModal(`<form onsubmit="return addP(event,'${id||''}')"><h3 class="hd text-2xl font-bold mb-4">${p?'Editar pago':'Registrar pago'}</h3>
+  ${field('Alumno',`<select name="a" id="pa" class="inp" onchange="pDiscs()">${S.alumnos.map(a=>`<option value="${a.id}" ${p&&p.alumno===a.id?'selected':''}>${esc(a.nombre)}</option>`).join('')}</select>`)}
   <div class="text-sm font-medium mb-1">Disciplinas que paga</div><div id="pd" class="mb-3"></div>
-  ${field('Período (mes)',`<input name="per" type="month" required class="inp" value="${ym(today)}" onchange="if(this.value){$('#pv').value=this.value+'-10';pCalc()}">`)}
-  ${field('Fecha de vencimiento',`<input name="v" id="pv" type="date" required class="inp" value="${ym(today)}-10" onchange="pCalc()">`)}
-  <label class="flex items-center gap-2 text-sm font-medium mb-2"><input type="checkbox" name="pg" id="pg" checked onchange="$('#pfw').hidden=!this.checked;pCalc()">Ya fue pagado</label>
-  <div id="pfw">${field('Fecha de pago',`<input name="f" id="pf" type="date" class="inp" value="${iso(today)}" onchange="pCalc()">`)}</div>
+  ${field('Fecha de pago',`<input name="f" id="pf" type="date" ${legacy?'':'required'} class="inp" value="${p?(p.fecha||''):f0}" onchange="pDate()">`)}
+  ${field('Próximo vencimiento (se calcula solo)',`<input name="v" id="pv" type="date" required class="inp" value="${p?p.vence:addMes(f0)}">`)}
+  ${legacy?'<label class="flex items-center gap-2 text-sm font-medium mb-3"><input type="checkbox" id="pg">Ya fue pagado</label>':''}
+  ${field('Recargo (ARS)',`<input name="r" id="pr" type="number" min="0" class="inp" value="${p?(p.recargo||0):0}" oninput="pAuto=false;pCalc()">`)}
   <div id="pt" class="rounded-md p-3 text-sm" style="background:#f3f7f6"></div>
-  ${actions('Guardar pago')}</form>`);pDiscs();
+  ${actions('Guardar')}</form>`);pDiscs(p?p.discs||[]:null);
 }
-function pDiscs(){const a=alumno($('#pa').value);
-  $('#pd').innerHTML=S.disc.map(d=>{const on=a.insc.some(i=>i.d===d.id);return`<label class="flex items-center gap-2 text-sm py-0.5"><input type="checkbox" value="${d.id}" data-p="${d.precio}" ${on?'checked':''} onchange="pCalc()">${esc(d.nombre)} · ${money(d.precio)}${on?'':' <span style="color:var(--mute)">(se agrega al alumno)</span>'}</label>`}).join('');pCalc()}
-function pVals(){const base=[...document.querySelectorAll('#pd input:checked')].reduce((t,x)=>t+Number(x.dataset.p),0);
-  const pg=$('#pg').checked,v=$('#pv').value,f=$('#pf').value||iso(today),rc=pg?recargoDe(base,v,f):0,w=!!$('#prc')&&!$('#prc').checked;
-  return{base,pg,v,f,rc,w,total:base+(rc&&!w?rc:0)}}
-function pCalc(){const x=pVals(),late=x.pg&&x.v?Math.round((new Date(x.f+'T12:00:00')-new Date(x.v+'T12:00:00'))/864e5):0;
-  $('#pt').innerHTML=`<div class="flex justify-between"><span>Cuota</span><span>${money(x.base)}</span></div>`+(x.rc?`<div class="flex justify-between items-center py-1" style="color:var(--warn)"><label class="flex items-center gap-2"><input type="checkbox" id="prc" ${x.w?'':'checked'} onchange="pCalc()">Recargo por ${late} días de atraso</label><span>${money(x.rc)}</span></div>`:'')+`<div class="flex justify-between font-semibold text-base pt-1 mt-1" style="border-top:1px solid var(--line)"><span>Total</span><span>${money(x.total)}</span></div>`+(x.pg?'':'<div class="text-xs mt-1" style="color:var(--mute)">Quedará pendiente: el estado se calcula solo con la fecha de vencimiento.</div>')}
-function addP(e){e.preventDefault();const f=new FormData(e.target),x=pVals(),ids=[...document.querySelectorAll('#pd input:checked')].map(i=>i.value);
+function pDiscs(sel){const a=alumno($('#pa').value);if(!pEdit)pAuto=true;
+  $('#pd').innerHTML=S.disc.map(d=>{const own=a.insc.some(i=>i.d===d.id),on=sel?sel.includes(d.id):own;return`<label class="flex items-center gap-2 text-sm py-0.5"><input type="checkbox" value="${d.id}" data-p="${d.precio}" ${on?'checked':''} onchange="pCalc(true)">${esc(d.nombre)} · ${money(d.precio)}${own?'':' <span style="color:var(--mute)">(se agrega al alumno)</span>'}</label>`}).join('');pCalc(true)}
+function pDate(){const f=$('#pf').value;if(f)$('#pv').value=addMes(f);pCalc(true)}
+function pBase(){const c=[...document.querySelectorAll('#pd input:checked')],ids=c.map(x=>x.value);
+  if(pEdit&&ids.length&&ids.length===(pEdit.discs||[]).length&&ids.every(i=>pEdit.discs.includes(i)))return Math.max(0,pEdit.monto-(pEdit.recargo||0));
+  return c.reduce((t,x)=>t+Number(x.dataset.p),0)}
+function pCalc(re){const a=alumno($('#pa').value),b=pBase(),f=$('#pf').value,due=dueDe(a);
+  if(re&&pAuto)$('#pr').value=f?recargoDe(b,due,f):0;
+  const r=Math.max(0,Number($('#pr').value)||0);
+  $('#pt').innerHTML=`<div class="flex justify-between"><span>Cuota</span><span>${money(b)}</span></div>`+(r?`<div class="flex justify-between" style="color:var(--warn)"><span>Recargo</span><span>${money(r)}</span></div>`:'')+`<div class="flex justify-between font-semibold text-base pt-1 mt-1" style="border-top:1px solid var(--line)"><span>Total</span><span>${money(b+r)}</span></div>`+(!pEdit&&due?`<div class="text-xs mt-1" style="color:var(--mute)">Su vencimiento anterior era el ${fdate(due)}.</div>`:'')}
+function addP(e,id){e.preventDefault();const f=new FormData(e.target),ids=[...document.querySelectorAll('#pd input:checked')].map(i=>i.value);
   if(!ids.length){alert('Elegí al menos una disciplina.');return false}
-  const a=alumno(f.get('a'));ids.forEach(id=>{if(!a.insc.some(i=>i.d===id))a.insc.push({d:id,h:''})});
-  S.pagos.push({id:uid(),alumno:a.id,discs:ids,monto:x.total,recargo:x.rc&&!x.w?x.rc:0,periodo:f.get('per'),vence:f.get('v'),pagado:x.pg,fecha:x.pg?x.f:''});
+  const pg=id&&$('#pg')?$('#pg').checked:true,fecha=f.get('f');
+  if(pg&&!fecha){alert('Indicá la fecha de pago.');return false}
+  const a=alumno(f.get('a')),r=Math.max(0,Number(f.get('r'))||0),b=pBase();
+  ids.forEach(d=>{if(!a.insc.some(i=>i.d===d))a.insc.push({d,h:''})});
+  const data={alumno:a.id,discs:ids,monto:b+r,recargo:r,fecha:pg?fecha:'',vence:f.get('v'),periodo:(fecha||f.get('v')).slice(0,7),pagado:pg};
+  if(id)Object.assign(S.pagos.find(x=>x.id===id),data);else S.pagos.push({id:uid(),...data});
   save();closeModal();render();return false}
 function markPaid(id){const p=S.pagos.find(x=>x.id===id);let r=recargoDe(p.monto,p.vence,iso(today));
   if(r&&!confirm(`Esta cuota está atrasada: corresponde un recargo de ${money(r)}.\nTotal a cobrar: ${money(p.monto+r)}.\n\n¿Cobrar con recargo?`)){if(!confirm('¿Cobrar la cuota SIN recargo?'))return;r=0}
-  p.monto+=r;p.recargo=r;p.pagado=true;p.fecha=iso(today);save();render()}
+  p.monto+=r;p.recargo=r;p.pagado=true;p.fecha=iso(today);p.vence=addMes(p.fecha);p.periodo=p.fecha.slice(0,7);save();render()}
 function delP(id){if(!confirm('¿Eliminar este registro de pago?'))return;S.pagos=S.pagos.filter(p=>p.id!==id);save();render()}
 
 /* ---------- Configuración ---------- */
@@ -340,27 +350,48 @@ const DEFR={on:false,dias:5,tipo:'pct',valor:10};
 const cfgR=()=>({...DEFR,...((S&&S.cfg.recargo)||{})});
 function recargoDe(base,vence,fp){const r=cfgR();if(!r.on||!vence||!fp)return 0;const late=Math.round((new Date(fp+'T12:00:00')-new Date(vence+'T12:00:00'))/864e5);if(late<=0||late<r.dias)return 0;return Math.round(r.tipo==='pct'?base*r.valor/100:r.valor)}
 let alertOff=false;
+const cfgE=()=>({inactivo:30,...((S&&S.cfg.reglas)||{})});
+const addMes=f=>{const [y,m,d]=f.split('-').map(Number),dim=new Date(y,m+1,0).getDate();return iso(new Date(y,m,Math.min(d,dim)))};
+const dueDe=a=>{const mine=S.pagos.filter(p=>p.alumno===a.id),u=mine.filter(p=>!p.pagado&&p.vence).map(p=>p.vence).sort();if(u.length)return u[0];const v=mine.filter(p=>p.vence).map(p=>p.vence).sort();return v.length?v[v.length-1]:(a.alta||'')};
+const cuotaDe=a=>a.insc.reduce((t,i)=>t+(disc(i.d)?disc(i.d).precio:0),0);
+function estA(a){
+  const due=dueDe(a),pvd=cfgA().pv.dias;
+  if(!a.insc.length)return{k:'Inactivo',due,late:0,pv:false,why:'Sin disciplinas'};
+  if(!due)return{k:'Activo',due:'',late:0,pv:false,sin:true};
+  const d=dias(due);
+  if(d>=0)return{k:'Activo',due,late:0,pv:d<=pvd,left:d};
+  return{k:-d>cfgE().inactivo?'Inactivo':'Debe cuota',due,late:-d,pv:false}
+}
+let filtA='';
+const estTag=x=>x.k==='Activo'?'<span class="tag Pagado">Activo</span>':x.k==='Debe cuota'?'<span class="tag Vencido">Debe cuota</span>':'<span class="tag Pendiente">Inactivo</span>';
+const estSub=x=>x.sin?'Sin pagos registrados':x.k==='Activo'?`Vence el ${fdate(x.due)}${x.pv?(x.left===0?' (hoy)':` (en ${x.left} d)`):''}`:x.why||`${x.late} ${x.late===1?'día':'días'} de atraso`;
 function alertas(){
-  const A=cfgA(),out=[],ven=S.pagos.filter(p=>!p.pagado&&estado(p)==='Vencido'),por=S.pagos.filter(p=>!p.pagado&&estado(p)==='Por vencer');
-  const n=l=>new Set(l.map(p=>p.alumno)).size,pl=(k,a,b)=>k===1?a:b;
-  if(A.pv.on&&por.length){const k=n(por);out.push(['warn',`${k} ${pl(k,'alumno tiene','alumnos tienen')} la cuota por vencer en los próximos ${A.pv.dias} días`,'Por vencer'])}
-  if(A.venc.on&&ven.length){const k=n(ven);out.push(['bad',`${k} ${pl(k,'alumno tiene','alumnos tienen')} cuotas vencidas (${money(ven.reduce((t,p)=>t+Number(p.monto),0))})`,'Vencido'])}
-  if(A.largo.on){const m={};ven.forEach(p=>{const a=alumno(p.alumno);if(!a)return;const d=-dias(p.vence);if(!m[a.id]||d>m[a.id].d)m[a.id]={n:a.nombre,d}});
-    const l=Object.values(m).filter(o=>o.d>=A.largo.dias).sort((a,b)=>b.d-a.d);
-    l.slice(0,5).forEach(o=>out.push(['bad',`${o.n} tiene ${o.d} ${pl(o.d,'día','días')} vencido`,'Vencido']));
-    if(l.length>5)out.push(['bad',`y ${l.length-5} alumno${l.length-5>1?'s':''} más con ${A.largo.dias} días o más de atraso`,'Vencido'])}
+  const A=cfgA(),out=[],ST=S.alumnos.map(a=>({a,...estA(a)})),pl=(k,a,b)=>k===1?a:b;
+  if(A.largo.on){const l=ST.filter(x=>x.k==='Debe cuota'&&x.late>=A.largo.dias).sort((a,b)=>b.late-a.late);
+    l.slice(0,5).forEach(x=>out.push(['rojo',`${x.a.nombre} tiene ${x.late} ${pl(x.late,'día','días')} vencido`]));
+    if(l.length>5)out.push(['rojo',`y ${l.length-5} alumno${l.length-5>1?'s':''} más con ${A.largo.dias} días o más de atraso`])}
+  if(A.venc.on){const l=ST.filter(x=>x.k==='Debe cuota'&&!(A.largo.on&&x.late>=A.largo.dias)).sort((a,b)=>b.late-a.late);
+    if(l.length)out.push(['naranja',`${l.length} ${pl(l.length,'alumno tiene','alumnos tienen')} la cuota vencida: ${l.slice(0,3).map(x=>`${x.a.nombre} (${x.late} d)`).join(', ')}${l.length>3?` y ${l.length-3} más`:''}`])}
+  if(A.pv.on){const l=ST.filter(x=>x.pv).sort((a,b)=>a.left-b.left);
+    if(l.length)out.push(['amarillo',`${l.length} ${pl(l.length,'alumno tiene','alumnos tienen')} la cuota por vencer en ${A.pv.dias} días o menos: ${l.slice(0,3).map(x=>`${x.a.nombre} (${x.left===0?'hoy':'en '+x.left+' d'})`).join(', ')}${l.length>3?` y ${l.length-3} más`:''}`])}
   return out}
 function renderAlerts(){const el=$('#alertas');if(!el)return;const l=alertOff||!S?[]:alertas();el.hidden=!l.length;
-  el.innerHTML=l.length?`<div class="flex justify-between items-center mb-1"><span class="text-xs font-semibold" style="color:var(--mute)">ALERTAS</span><button type="button" class="text-xs underline" style="color:var(--mute)" onclick="alertOff=true;renderAlerts()">Ocultar</button></div>`+l.map(([t,m,f])=>`<button type="button" class="al ${t}" onclick="goPagos('${f}')">${esc(m)}</button>`).join(''):''}
-function goPagos(e){filt.estado=e;filt.periodo='';view='pagos';render()}
+  el.innerHTML=l.length?`<div class="flex justify-between items-center mb-1"><span class="text-xs font-semibold" style="color:var(--mute)">ALERTAS</span><button type="button" class="text-xs underline" style="color:var(--mute)" onclick="alertOff=true;renderAlerts()">Ocultar</button></div>`+l.map(([t,m])=>`<button type="button" class="al ${t}" onclick="goAlum()">${esc(m)}</button>`).join(''):''}
+function goAlum(){filtA='';view='alumnos';render()}
 function setAl(k,f,v){const a=cfgA();a[k][f]=f==='dias'?Math.max(1,Math.min(90,parseInt(v)||1)):v;S.cfg.alertas=a;save();renderAlerts()}
 function setRc(f,v){const r=cfgR();r[f]=f==='on'||f==='tipo'?v:Math.max(0,Number(v)||0);if(f==='dias')r.dias=Math.round(r.dias);S.cfg.recargo=r;save()}
 const numIn=(v,fn,w)=>`<input type="number" min="0" value="${v}" class="inp" style="width:${w||'4.5rem'};display:inline-block;padding:.2rem .4rem" onchange="${fn}">`;
-function vAl(){const a=cfgA(),row=(k,t)=>`<div class="flex items-start gap-2 text-sm py-2" style="border-bottom:1px solid var(--line)"><input type="checkbox" class="mt-1" ${a[k].on?'checked':''} onchange="setAl('${k}','on',this.checked)"><span>${t}</span></div>`;
-  return `<div class="card p-6 max-w-lg mt-4"><h3 class="hd text-2xl font-bold mb-1">Alertas</h3><p class="text-sm mb-2" style="color:var(--mute)">Elegí qué avisos ver arriba de la pantalla y con cuántos días.</p>
-  ${row('pv',`Avisar cuotas por vencer, con ${numIn(a.pv.dias,"setAl('pv','dias',this.value)")} días de anticipación. Es también el momento en que una cuota pasa a "Por vencer".`)}
-  ${row('venc','Avisar cuántos alumnos tienen cuotas vencidas.')}
-  ${row('largo',`Avisar por nombre a los alumnos con ${numIn(a.largo.dias,"setAl('largo','dias',this.value)")} días o más de atraso.`)}</div>`}
+function vAl(){const a=cfgA(),dot=c=>`<span class="inline-block h-3 w-3 rounded-full align-middle" style="background:${c}"></span>`,row=(k,t)=>`<div class="flex items-start gap-2 text-sm py-2" style="border-bottom:1px solid var(--line)"><input type="checkbox" class="mt-1" ${a[k].on?'checked':''} onchange="setAl('${k}','on',this.checked)"><span>${t}</span></div>`;
+  return `<div class="card p-6 max-w-lg mt-4"><h3 class="hd text-2xl font-bold mb-1">Alertas</h3><p class="text-sm mb-2" style="color:var(--mute)">Elegí qué avisos ver arriba de la pantalla, con su color y sus días.</p>
+  ${row('pv',`${dot('#eab308')} <b>Amarillo:</b> cuotas por vencer, con ${numIn(a.pv.dias,"setAl('pv','dias',this.value)")} días de anticipación.`)}
+  ${row('venc',`${dot('#f97316')} <b>Naranja:</b> alumnos con la cuota vencida hace pocos días.`)}
+  ${row('largo',`${dot('#dc2626')} <b>Rojo:</b> alumnos con ${numIn(a.largo.dias,"setAl('largo','dias',this.value)")} días o más de atraso, por nombre.`)}</div>`}
+function setEs(v){S.cfg.reglas={inactivo:Math.max(1,Math.min(365,parseInt(v)||30))};save()}
+function vEs(){const e=cfgE();return `<div class="card p-6 max-w-lg mt-4"><h3 class="hd text-2xl font-bold mb-2">Estado de los alumnos</h3><div class="text-sm space-y-2">
+  <p><span class="tag Pagado">Activo</span> Tiene disciplinas y su cuota no está vencida. El vencimiento es la fecha del último pago más un mes.</p>
+  <p><span class="tag Vencido">Debe cuota</span> Pasó su vencimiento y lleva hasta ${numIn(e.inactivo,"setEs(this.value)")} días de atraso.</p>
+  <p><span class="tag Pendiente">Inactivo</span> No tiene disciplinas, o supera esos días de atraso. Los inactivos no generan alertas.</p>
+  <p style="color:var(--mute)">Un alumno nuevo vence el día en que se anota, hasta que se registra su primer pago.</p></div></div>`}
 function vRc(){const r=cfgR();
   return `<div class="card p-6 max-w-lg mt-4"><h3 class="hd text-2xl font-bold mb-1">Recargo por atraso</h3><p class="text-sm mb-2" style="color:var(--mute)">Si tu centro no cobra recargo, dejalo desactivado. Se calcula al registrar el pago y podés quitarlo en cada caso.</p>
   <div class="flex items-start gap-2 text-sm py-2"><input type="checkbox" class="mt-1" ${r.on?'checked':''} onchange="setRc('on',this.checked)"><span>Cobrar recargo a las cuotas pagadas con ${numIn(r.dias,"setRc('dias',this.value)")} días o más de atraso.</span></div>
@@ -396,7 +427,7 @@ function vApar(){const t={...DEFT,...(S.cfg.tema||{})};
   <div class="flex items-center gap-4 mb-3"><img id="fp" ${S.cfg.fondo?`src="${S.cfg.fondo}"`:'hidden'} alt="Fondo" class="h-16 w-24 object-cover rounded" style="border:1px solid var(--line)"><div><input type="file" accept="image/*" onchange="fondoUp(this)" class="text-sm"><button type="button" class="btn2 mt-2" onclick="quitaFondo()">Quitar fondo</button></div></div>
   <label class="block text-sm font-medium">Opacidad del velo sobre el fondo<input type="range" min="40" max="95" value="${t.velo}" class="w-full" oninput="setTema({velo:+this.value})"><span class="text-xs font-normal" style="color:var(--mute)">Más alto = fondo más suave y texto más fácil de leer.</span></label>
   <button type="button" class="btn2 mt-4" onclick="resetTema()">Restablecer colores</button></div>`}
-function vCfg(){const h=vCfg0(),k='<div class="card p-6 max-w-lg mt-4"><h3 class="hd text-2xl font-bold mb-1">Empezar de cero';const i=h.indexOf(k);const x=vApar()+vAl()+vRc();return i<0?h+x:h.slice(0,i)+x+h.slice(i)}
+function vCfg(){const h=vCfg0(),k='<div class="card p-6 max-w-lg mt-4"><h3 class="hd text-2xl font-bold mb-1">Empezar de cero';const i=h.indexOf(k);const x=vApar()+vAl()+vEs()+vRc();return i<0?h+x:h.slice(0,i)+x+h.slice(i)}
 function vCfg0(){tmpLogo=S.cfg.logo||'';
   return head('Configuración','Nombre, apariencia, alertas y recargos de tu establecimiento')+
   `<div class="card p-6 max-w-lg"><form onsubmit="return saveCfg(event)">
