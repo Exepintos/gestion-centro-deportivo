@@ -28,6 +28,8 @@ body{background:var(--bg);color:var(--ink);font-family:'Barlow',system-ui,sans-s
 th{text-align:left;font-weight:600;color:var(--mute);font-size:.85rem;padding:.6rem .8rem;border-bottom:1px solid var(--line)}
 td{padding:.65rem .8rem;border-bottom:1px solid var(--line);vertical-align:top}
 .scroll{overflow-x:auto}
+.al{display:block;width:100%;text-align:left;border-radius:8px;padding:.5rem .75rem;margin-bottom:.35rem;font-size:.9rem;font-weight:500}
+.al.warn{background:#fdeccd;color:#8a5a00}.al.bad{background:#fde0dd;color:var(--bad)}
 @media(max-width:767px){
 #nav{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--side);display:flex;gap:.15rem;padding:.3rem .3rem calc(.3rem + env(safe-area-inset-bottom,0px));box-shadow:0 -2px 8px rgba(0,0,0,.18)}
 #nav .nav{flex:1;text-align:center;font-size:.72rem;padding:.6rem .1rem}
@@ -67,6 +69,7 @@ td{padding:.65rem .8rem;border-bottom:1px solid var(--line);vertical-align:top}
   </aside>
   <main class="flex-1 p-4 pb-24 md:p-8 min-w-0">
     <div id="banner" class="mb-4 text-sm rounded-md p-3" style="background:#fdeccd;color:#8a5a00" hidden></div>
+    <div id="alertas" class="mb-4" hidden></div>
     <div id="view"></div>
   </main>
 </div>
@@ -95,7 +98,7 @@ const FIREBASE_CONFIG = {
 };
 const PRODUCTO = "Gestión Centro Deportivo";
 const CONTACTO = "3865859130";
-const TRIAL = 7;
+const TRIAL = 14;
 const DEF = "Mi Centro Deportivo";
 let S=null,uidCur=null,saveT=null,sent={};
 const setStat=t=>{const e=$('#sv');if(e)e.textContent=t};
@@ -119,7 +122,7 @@ const NAV=[['dash','Resumen'],['alumnos','Alumnos'],['disc','Disciplinas'],['pag
 const alumno=id=>S.alumnos.find(a=>a.id===id);
 const disc=id=>S.disc.find(d=>d.id===id);
 const dias=f=>Math.round((new Date(f+'T12:00:00')-new Date(iso(today)+'T12:00:00'))/864e5);
-const estado=p=>{if(p.pagado)return'Pagado';const d=dias(p.vence);return d<0?'Vencido':d<=5?'Por vencer':'Pendiente'};
+const estado=p=>{if(p.pagado)return'Pagado';const d=dias(p.vence);return d<0?'Vencido':d<=cfgA().pv.dias?'Por vencer':'Pendiente'};
 const cls=e=>e.replace(' ','');
 const tag=e=>`<span class="tag ${cls(e)}">${e}</span>`;
 const deuda=a=>S.pagos.filter(p=>p.alumno===a.id&&estado(p)==='Vencido');
@@ -173,7 +176,7 @@ async function enter(u){
     if(est==='prueba'&&trialLeft<=0)return block('Terminó tu prueba gratuita','Tus datos siguen guardados. Para seguir usando el sistema, activá tu plan. '+CONTACTO);
     if(est!=='activo'&&est!=='prueba')return block('Acceso no disponible',CONTACTO);
     await loadData(u.uid);
-    view='dash';brand();setStat('');
+    view='dash';alertOff=false;brand();setStat('');
     const b=$('#banner');b.hidden=trialLeft===null;if(trialLeft!==null)b.textContent='Prueba gratuita: te quedan '+trialLeft+' día'+(trialLeft===1?'':'s')+'. '+CONTACTO;
     show('app');render();
   }catch(e){
@@ -200,7 +203,7 @@ const actions=ok=>`<div class="flex justify-end gap-2 mt-5"><button type="button
 function render(){
   $('#nav').innerHTML=NAV.map(([k,l])=>`<button class="nav ${view===k?'on':''}" data-v="${k}">${l}</button>`).join('');
   $('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{view=b.dataset.v;render()});
-  $('#view').innerHTML=({dash,alumnos:vAlumnos,disc:vDisc,pagos:vPagos,cfg:vCfg})[view]();
+  $('#view').innerHTML=({dash,alumnos:vAlumnos,disc:vDisc,pagos:vPagos,cfg:vCfg})[view]();renderAlerts();
 }
 const head=(t,sub,btn)=>`<div class="flex flex-wrap items-end justify-between gap-3 mb-6"><div><h2 class="hd text-4xl font-bold">${t}</h2><p style="color:var(--mute)">${sub}</p></div>${btn||''}</div>`;
 const empty=t=>`<div class="p-8 text-center" style="color:var(--mute)">${t}</div>`;
@@ -297,31 +300,71 @@ function vPagos(){
     <select class="inp" style="width:auto" aria-label="Estado" onchange="filt.estado=this.value;render()"><option value="">Todos los estados</option>${['Pagado','Pendiente','Por vencer','Vencido'].map(s=>`<option ${filt.estado===s?'selected':''}>${s}</option>`).join('')}</select>
     <select class="inp" style="width:auto" aria-label="Período" onchange="filt.periodo=this.value;render()"><option value="">Todos los períodos</option>${per.map(p=>`<option value="${p}" ${filt.periodo===p?'selected':''}>${perLabel(p)}</option>`).join('')}</select>
     <span class="text-sm" style="color:var(--mute)">Cobrado en esta vista: <b style="color:var(--ok)">${money(total)}</b></span></div>
-  <div class="card scroll">${list.length?`<table class="w-full"><thead><tr><th>Alumno</th><th>Período</th><th>Disciplinas</th><th>Monto</th><th>Vence</th><th>Pagado el</th><th>Estado</th><th></th></tr></thead><tbody>${list.map(p=>`<tr><td class="font-medium">${esc(alumno(p.alumno)?.nombre||'Alumno eliminado')}</td><td>${perLabel(p.periodo)}</td><td>${(p.discs||[]).map(i=>disc(i)?`<span class="chip">${esc(disc(i).nombre)}</span>`:'').join('')||'—'}</td><td>${money(p.monto)}</td><td>${fdate(p.vence)}</td><td>${fdate(p.fecha)}</td><td>${tag(estado(p))}</td><td class="text-right whitespace-nowrap">${p.pagado?'':`<button class="btn2" onclick="markPaid('${p.id}')">Marcar pagado</button> `}<button class="btn2" style="color:var(--bad)" onclick="delP('${p.id}')">Eliminar</button></td></tr>`).join('')}</tbody></table>`:empty('No hay pagos con estos filtros. Registrá uno nuevo o cambiá los filtros.')}</div>`;
+  <div class="card scroll">${list.length?`<table class="w-full"><thead><tr><th>Alumno</th><th>Período</th><th>Disciplinas</th><th>Monto</th><th>Vence</th><th>Pagado el</th><th>Estado</th><th></th></tr></thead><tbody>${list.map(p=>`<tr><td class="font-medium">${esc(alumno(p.alumno)?.nombre||'Alumno eliminado')}</td><td>${perLabel(p.periodo)}</td><td>${(p.discs||[]).map(i=>disc(i)?`<span class="chip">${esc(disc(i).nombre)}</span>`:'').join('')||'—'}</td><td>${money(p.monto)}${p.recargo?`<div class="text-xs" style="color:var(--warn)">incluye recargo ${money(p.recargo)}</div>`:''}</td><td>${fdate(p.vence)}</td><td>${fdate(p.fecha)}</td><td>${tag(estado(p))}</td><td class="text-right whitespace-nowrap">${p.pagado?'':`<button class="btn2" onclick="markPaid('${p.id}')">Marcar pagado</button> `}<button class="btn2" style="color:var(--bad)" onclick="delP('${p.id}')">Eliminar</button></td></tr>`).join('')}</tbody></table>`:empty('No hay pagos con estos filtros. Registrá uno nuevo o cambiá los filtros.')}</div>`;
 }
 function formPago(){
   if(!S.alumnos.length){alert('Primero registrá al menos un alumno.');return}
+  if(!S.disc.length){alert('Primero creá al menos una disciplina.');return}
   openModal(`<form onsubmit="return addP(event)"><h3 class="hd text-2xl font-bold mb-4">Registrar pago</h3>
   ${field('Alumno',`<select name="a" id="pa" class="inp" onchange="pDiscs()">${S.alumnos.map(a=>`<option value="${a.id}">${esc(a.nombre)}</option>`).join('')}</select>`)}
   <div class="text-sm font-medium mb-1">Disciplinas que paga</div><div id="pd" class="mb-3"></div>
-  ${field('Monto total (ARS)','<input name="m" id="pm" type="number" min="0" required class="inp">')}
-  ${field('Período (mes)',`<input name="per" type="month" required class="inp" value="${ym(today)}" onchange="if(this.value)$('#pv').value=this.value+'-10'">`)}
-  ${field('Fecha de vencimiento',`<input name="v" id="pv" type="date" required class="inp" value="${ym(today)}-10">`)}
-  <label class="flex items-center gap-2 text-sm font-medium mb-2"><input type="checkbox" name="pg" onchange="$('#pfw').hidden=!this.checked">Ya fue pagado</label>
-  <div id="pfw" hidden>${field('Fecha de pago',`<input name="f" type="date" class="inp" value="${iso(today)}">`)}</div>
-  <p class="text-sm" style="color:var(--mute)">Si no está pagado, el estado (pendiente, por vencer o vencido) se calcula solo con la fecha de vencimiento.</p>
+  ${field('Período (mes)',`<input name="per" type="month" required class="inp" value="${ym(today)}" onchange="if(this.value){$('#pv').value=this.value+'-10';pCalc()}">`)}
+  ${field('Fecha de vencimiento',`<input name="v" id="pv" type="date" required class="inp" value="${ym(today)}-10" onchange="pCalc()">`)}
+  <label class="flex items-center gap-2 text-sm font-medium mb-2"><input type="checkbox" name="pg" id="pg" checked onchange="$('#pfw').hidden=!this.checked;pCalc()">Ya fue pagado</label>
+  <div id="pfw">${field('Fecha de pago',`<input name="f" id="pf" type="date" class="inp" value="${iso(today)}" onchange="pCalc()">`)}</div>
+  <div id="pt" class="rounded-md p-3 text-sm" style="background:#f3f7f6"></div>
   ${actions('Guardar pago')}</form>`);pDiscs();
 }
 function pDiscs(){const a=alumno($('#pa').value);
-  $('#pd').innerHTML=a.insc.length?a.insc.map(i=>{const d=disc(i.d);return d?`<label class="flex items-center gap-2 text-sm"><input type="checkbox" value="${d.id}" data-p="${d.precio}" checked onchange="pSum()">${esc(d.nombre)} · ${money(d.precio)}</label>`:''}).join(''):'<span class="text-sm" style="color:var(--mute)">Este alumno no tiene disciplinas. Escribí el monto a mano.</span>';pSum()}
-function pSum(){$('#pm').value=[...document.querySelectorAll('#pd input:checked')].reduce((s,x)=>s+Number(x.dataset.p),0)||''}
-function addP(e){e.preventDefault();const f=new FormData(e.target),pagado=f.get('pg')==='on';
-  S.pagos.push({id:uid(),alumno:f.get('a'),discs:[...document.querySelectorAll('#pd input:checked')].map(x=>x.value),monto:Number(f.get('m')),periodo:f.get('per'),vence:f.get('v'),pagado,fecha:pagado?(f.get('f')||iso(today)):''});
+  $('#pd').innerHTML=S.disc.map(d=>{const on=a.insc.some(i=>i.d===d.id);return`<label class="flex items-center gap-2 text-sm py-0.5"><input type="checkbox" value="${d.id}" data-p="${d.precio}" ${on?'checked':''} onchange="pCalc()">${esc(d.nombre)} · ${money(d.precio)}${on?'':' <span style="color:var(--mute)">(se agrega al alumno)</span>'}</label>`}).join('');pCalc()}
+function pVals(){const base=[...document.querySelectorAll('#pd input:checked')].reduce((t,x)=>t+Number(x.dataset.p),0);
+  const pg=$('#pg').checked,v=$('#pv').value,f=$('#pf').value||iso(today),rc=pg?recargoDe(base,v,f):0,w=!!$('#prc')&&!$('#prc').checked;
+  return{base,pg,v,f,rc,w,total:base+(rc&&!w?rc:0)}}
+function pCalc(){const x=pVals(),late=x.pg&&x.v?Math.round((new Date(x.f+'T12:00:00')-new Date(x.v+'T12:00:00'))/864e5):0;
+  $('#pt').innerHTML=`<div class="flex justify-between"><span>Cuota</span><span>${money(x.base)}</span></div>`+(x.rc?`<div class="flex justify-between items-center py-1" style="color:var(--warn)"><label class="flex items-center gap-2"><input type="checkbox" id="prc" ${x.w?'':'checked'} onchange="pCalc()">Recargo por ${late} días de atraso</label><span>${money(x.rc)}</span></div>`:'')+`<div class="flex justify-between font-semibold text-base pt-1 mt-1" style="border-top:1px solid var(--line)"><span>Total</span><span>${money(x.total)}</span></div>`+(x.pg?'':'<div class="text-xs mt-1" style="color:var(--mute)">Quedará pendiente: el estado se calcula solo con la fecha de vencimiento.</div>')}
+function addP(e){e.preventDefault();const f=new FormData(e.target),x=pVals(),ids=[...document.querySelectorAll('#pd input:checked')].map(i=>i.value);
+  if(!ids.length){alert('Elegí al menos una disciplina.');return false}
+  const a=alumno(f.get('a'));ids.forEach(id=>{if(!a.insc.some(i=>i.d===id))a.insc.push({d:id,h:''})});
+  S.pagos.push({id:uid(),alumno:a.id,discs:ids,monto:x.total,recargo:x.rc&&!x.w?x.rc:0,periodo:f.get('per'),vence:f.get('v'),pagado:x.pg,fecha:x.pg?x.f:''});
   save();closeModal();render();return false}
-function markPaid(id){const p=S.pagos.find(x=>x.id===id);p.pagado=true;p.fecha=iso(today);save();render()}
+function markPaid(id){const p=S.pagos.find(x=>x.id===id);let r=recargoDe(p.monto,p.vence,iso(today));
+  if(r&&!confirm(`Esta cuota está atrasada: corresponde un recargo de ${money(r)}.\nTotal a cobrar: ${money(p.monto+r)}.\n\n¿Cobrar con recargo?`)){if(!confirm('¿Cobrar la cuota SIN recargo?'))return;r=0}
+  p.monto+=r;p.recargo=r;p.pagado=true;p.fecha=iso(today);save();render()}
 function delP(id){if(!confirm('¿Eliminar este registro de pago?'))return;S.pagos=S.pagos.filter(p=>p.id!==id);save();render()}
 
 /* ---------- Configuración ---------- */
+/* ---------- alertas y recargo ---------- */
+const DEFA={pv:{on:true,dias:5},venc:{on:true},largo:{on:true,dias:15}};
+const cfgA=()=>{const a=(S&&S.cfg.alertas)||{};return{pv:{...DEFA.pv,...a.pv},venc:{...DEFA.venc,...a.venc},largo:{...DEFA.largo,...a.largo}}};
+const DEFR={on:false,dias:5,tipo:'pct',valor:10};
+const cfgR=()=>({...DEFR,...((S&&S.cfg.recargo)||{})});
+function recargoDe(base,vence,fp){const r=cfgR();if(!r.on||!vence||!fp)return 0;const late=Math.round((new Date(fp+'T12:00:00')-new Date(vence+'T12:00:00'))/864e5);if(late<=0||late<r.dias)return 0;return Math.round(r.tipo==='pct'?base*r.valor/100:r.valor)}
+let alertOff=false;
+function alertas(){
+  const A=cfgA(),out=[],ven=S.pagos.filter(p=>!p.pagado&&estado(p)==='Vencido'),por=S.pagos.filter(p=>!p.pagado&&estado(p)==='Por vencer');
+  const n=l=>new Set(l.map(p=>p.alumno)).size,pl=(k,a,b)=>k===1?a:b;
+  if(A.pv.on&&por.length){const k=n(por);out.push(['warn',`${k} ${pl(k,'alumno tiene','alumnos tienen')} la cuota por vencer en los próximos ${A.pv.dias} días`,'Por vencer'])}
+  if(A.venc.on&&ven.length){const k=n(ven);out.push(['bad',`${k} ${pl(k,'alumno tiene','alumnos tienen')} cuotas vencidas (${money(ven.reduce((t,p)=>t+Number(p.monto),0))})`,'Vencido'])}
+  if(A.largo.on){const m={};ven.forEach(p=>{const a=alumno(p.alumno);if(!a)return;const d=-dias(p.vence);if(!m[a.id]||d>m[a.id].d)m[a.id]={n:a.nombre,d}});
+    const l=Object.values(m).filter(o=>o.d>=A.largo.dias).sort((a,b)=>b.d-a.d);
+    l.slice(0,5).forEach(o=>out.push(['bad',`${o.n} tiene ${o.d} ${pl(o.d,'día','días')} vencido`,'Vencido']));
+    if(l.length>5)out.push(['bad',`y ${l.length-5} alumno${l.length-5>1?'s':''} más con ${A.largo.dias} días o más de atraso`,'Vencido'])}
+  return out}
+function renderAlerts(){const el=$('#alertas');if(!el)return;const l=alertOff||!S?[]:alertas();el.hidden=!l.length;
+  el.innerHTML=l.length?`<div class="flex justify-between items-center mb-1"><span class="text-xs font-semibold" style="color:var(--mute)">ALERTAS</span><button type="button" class="text-xs underline" style="color:var(--mute)" onclick="alertOff=true;renderAlerts()">Ocultar</button></div>`+l.map(([t,m,f])=>`<button type="button" class="al ${t}" onclick="goPagos('${f}')">${esc(m)}</button>`).join(''):''}
+function goPagos(e){filt.estado=e;filt.periodo='';view='pagos';render()}
+function setAl(k,f,v){const a=cfgA();a[k][f]=f==='dias'?Math.max(1,Math.min(90,parseInt(v)||1)):v;S.cfg.alertas=a;save();renderAlerts()}
+function setRc(f,v){const r=cfgR();r[f]=f==='on'||f==='tipo'?v:Math.max(0,Number(v)||0);if(f==='dias')r.dias=Math.round(r.dias);S.cfg.recargo=r;save()}
+const numIn=(v,fn,w)=>`<input type="number" min="0" value="${v}" class="inp" style="width:${w||'4.5rem'};display:inline-block;padding:.2rem .4rem" onchange="${fn}">`;
+function vAl(){const a=cfgA(),row=(k,t)=>`<div class="flex items-start gap-2 text-sm py-2" style="border-bottom:1px solid var(--line)"><input type="checkbox" class="mt-1" ${a[k].on?'checked':''} onchange="setAl('${k}','on',this.checked)"><span>${t}</span></div>`;
+  return `<div class="card p-6 max-w-lg mt-4"><h3 class="hd text-2xl font-bold mb-1">Alertas</h3><p class="text-sm mb-2" style="color:var(--mute)">Elegí qué avisos ver arriba de la pantalla y con cuántos días.</p>
+  ${row('pv',`Avisar cuotas por vencer, con ${numIn(a.pv.dias,"setAl('pv','dias',this.value)")} días de anticipación. Es también el momento en que una cuota pasa a "Por vencer".`)}
+  ${row('venc','Avisar cuántos alumnos tienen cuotas vencidas.')}
+  ${row('largo',`Avisar por nombre a los alumnos con ${numIn(a.largo.dias,"setAl('largo','dias',this.value)")} días o más de atraso.`)}</div>`}
+function vRc(){const r=cfgR();
+  return `<div class="card p-6 max-w-lg mt-4"><h3 class="hd text-2xl font-bold mb-1">Recargo por atraso</h3><p class="text-sm mb-2" style="color:var(--mute)">Si tu centro no cobra recargo, dejalo desactivado. Se calcula al registrar el pago y podés quitarlo en cada caso.</p>
+  <div class="flex items-start gap-2 text-sm py-2"><input type="checkbox" class="mt-1" ${r.on?'checked':''} onchange="setRc('on',this.checked)"><span>Cobrar recargo a las cuotas pagadas con ${numIn(r.dias,"setRc('dias',this.value)")} días o más de atraso.</span></div>
+  <div class="flex flex-wrap items-center gap-2 text-sm"><span>Recargo de</span>${numIn(r.valor,"setRc('valor',this.value)",'6rem')}<select class="inp" style="width:auto" onchange="setRc('tipo',this.value)"><option value="pct" ${r.tipo==='pct'?'selected':''}>% de la cuota</option><option value="fijo" ${r.tipo==='fijo'?'selected':''}>pesos (monto fijo)</option></select></div></div>`}
 /* ---------- apariencia ---------- */
 const DEFT={acc:'#0e7c86',side:'#0f3441',velo:85};
 const PRE=[['Turquesa','#0e7c86','#0f3441'],['Azul','#2563eb','#14213d'],['Verde cancha','#15803d','#14352a'],['Naranja','#ea580c','#3a2417'],['Violeta','#7c3aed','#2e1a47'],['Rojo y negro','#dc2626','#1c1c1f'],['Rosa','#db2777','#3b1230'],['Claro','#0e7c86','#dfe9e8']];
@@ -353,9 +396,9 @@ function vApar(){const t={...DEFT,...(S.cfg.tema||{})};
   <div class="flex items-center gap-4 mb-3"><img id="fp" ${S.cfg.fondo?`src="${S.cfg.fondo}"`:'hidden'} alt="Fondo" class="h-16 w-24 object-cover rounded" style="border:1px solid var(--line)"><div><input type="file" accept="image/*" onchange="fondoUp(this)" class="text-sm"><button type="button" class="btn2 mt-2" onclick="quitaFondo()">Quitar fondo</button></div></div>
   <label class="block text-sm font-medium">Opacidad del velo sobre el fondo<input type="range" min="40" max="95" value="${t.velo}" class="w-full" oninput="setTema({velo:+this.value})"><span class="text-xs font-normal" style="color:var(--mute)">Más alto = fondo más suave y texto más fácil de leer.</span></label>
   <button type="button" class="btn2 mt-4" onclick="resetTema()">Restablecer colores</button></div>`}
-function vCfg(){const h=vCfg0(),k='<div class="card p-6 max-w-lg mt-4"><h3 class="hd text-2xl font-bold mb-1">Empezar de cero';const i=h.indexOf(k);return i<0?h+vApar():h.slice(0,i)+vApar()+h.slice(i)}
+function vCfg(){const h=vCfg0(),k='<div class="card p-6 max-w-lg mt-4"><h3 class="hd text-2xl font-bold mb-1">Empezar de cero';const i=h.indexOf(k);const x=vApar()+vAl()+vRc();return i<0?h+x:h.slice(0,i)+x+h.slice(i)}
 function vCfg0(){tmpLogo=S.cfg.logo||'';
-  return head('Configuración','Nombre, logo y apariencia de tu establecimiento')+
+  return head('Configuración','Nombre, apariencia, alertas y recargos de tu establecimiento')+
   `<div class="card p-6 max-w-lg"><form onsubmit="return saveCfg(event)">
   ${field('Nombre del establecimiento',`<input name="n" required class="inp" value="${esc(S.cfg.nombre)}">`)}
   <div class="text-sm font-medium mb-2">Logo</div>
