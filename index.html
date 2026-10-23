@@ -66,9 +66,11 @@ td{padding:.65rem .8rem;border-bottom:1px solid var(--line);vertical-align:top}
     <div id="sbrand" class="flex items-center gap-2 md:mb-4 px-2 min-w-0"></div>
     <nav class="flex md:flex-col gap-1 flex-1 md:flex-none scroll" id="nav"></nav>
     <span id="sv" class="hidden md:block text-xs px-2 md:mt-auto" style="color:var(--sidemut,#8fb3bb)"></span>
+    <div id="plan" class="hidden md:block text-xs px-2" style="color:var(--sidemut,#8fb3bb)"></div>
     <button id="out" class="nav md:mt-1 w-auto md:w-full" style="color:var(--outc,#f4b8b0)"><span class="md:hidden">Salir</span><span class="hidden md:inline">Cerrar sesión</span></button>
   </aside>
   <main class="flex-1 p-4 pb-24 md:p-8 min-w-0">
+    <div id="planm" class="md:hidden text-xs text-right mb-2" style="color:var(--mute)" hidden></div>
     <div id="banner" class="mb-4 text-sm rounded-md p-3" style="background:#fdeccd;color:#8a5a00" hidden></div>
     <div id="alertas" class="mb-4" hidden></div>
     <div id="view"></div>
@@ -163,22 +165,25 @@ async function initFB(){
     const [a,au,fs]=await Promise.all([import(V+'firebase-app.js'),import(V+'firebase-auth.js'),import(V+'firebase-firestore.js')]);
     const app=a.initializeApp(FIREBASE_CONFIG);
     F={auth:au.getAuth(app),db:fs.getFirestore(app),signIn:au.signInWithEmailAndPassword,signUp:au.createUserWithEmailAndPassword,signOut:au.signOut,reset:au.sendPasswordResetEmail,fs};
-    au.onAuthStateChanged(F.auth,u=>{if(u)enter(u);else{S=null;uidCur=null;sent={};brand();show('login');setMode(mode)}});
+    au.onAuthStateChanged(F.auth,u=>{if(u)enter(u);else{S=null;uidCur=null;sent={};isAdmin=false;ADM=null;showPlan(null);brand();show('login');setMode(mode)}});
   }catch(e){block('No se pudo conectar','Revisá tu conexión a internet y recargá la página.')}
 }
 async function enter(u){
   show('load');const {doc,getDoc,setDoc,serverTimestamp}=F.fs,db=F.db;
   try{
+    isAdmin=false;try{isAdmin=(await getDoc(doc(db,'admins',u.uid))).exists()}catch(e){}
     let ls=await getDoc(doc(db,'licencias',u.uid));
     if(!ls.exists()){await setDoc(doc(db,'licencias',u.uid),{email:u.email,estado:'prueba',creado:serverTimestamp()});ls=await getDoc(doc(db,'licencias',u.uid))}
-    const L=ls.data(),est=L.estado,ms=L.creado&&L.creado.toDate?Date.now()-L.creado.toDate().getTime():0;
-    trialLeft=est==='prueba'?Math.ceil(TRIAL-ms/864e5):null;
-    if(est==='suspendido')return block('Acceso suspendido','Tu acceso está suspendido. Tus datos siguen guardados y se recuperan al reactivar el servicio. '+CONTACTO);
-    if(est==='prueba'&&trialLeft<=0)return block('Terminó tu prueba gratuita','Tus datos siguen guardados. Para seguir usando el sistema, activá tu plan. '+CONTACTO);
-    if(est!=='activo'&&est!=='prueba')return block('Acceso no disponible',CONTACTO);
+    const L=ls.data(),est=L.estado,now=Date.now(),cr=L.creado&&L.creado.toDate?L.creado.toDate().getTime():now,hs=L.hasta&&L.hasta.toDate?L.hasta.toDate().getTime():null;
+    const left=est==='prueba'?Math.ceil(TRIAL-(now-cr)/864e5):(est==='activo'&&hs?Math.ceil((hs-now)/864e5):null);
+    if(!isAdmin){
+      if(est==='suspendido')return block('Acceso suspendido','Tu acceso está suspendido. Tus datos siguen guardados y se recuperan al reactivar el servicio. '+CONTACTO);
+      if(est==='prueba'&&left<=0)return block('Terminó tu prueba gratuita','Tus datos siguen guardados. Para seguir usando el sistema, activá tu plan. '+CONTACTO);
+      if(est==='activo'&&hs&&left<=0)return block('Tu plan venció','Tus datos siguen guardados. Para renovar tu plan: '+CONTACTO);
+      if(est!=='activo'&&est!=='prueba')return block('Acceso no disponible',CONTACTO)}
     await loadData(u.uid);
     view='dash';alertOff=false;brand();setStat('');
-    const b=$('#banner');b.hidden=trialLeft===null;if(trialLeft!==null)b.textContent='Prueba gratuita: te quedan '+trialLeft+' día'+(trialLeft===1?'':'s')+'. '+CONTACTO;
+    showPlan(isAdmin?null:{est,left,hs});
     show('app');render();
   }catch(e){
     if(e.code==='permission-denied')block('Acceso no disponible','No tenés permiso para ver los datos. '+CONTACTO);
@@ -202,9 +207,9 @@ const actions=ok=>`<div class="flex justify-end gap-2 mt-5"><button type="button
 
 /* ---------- render ---------- */
 function render(){
-  $('#nav').innerHTML=NAV.map(([k,l])=>`<button class="nav ${view===k?'on':''}" data-v="${k}">${l}</button>`).join('');
+  $('#nav').innerHTML=(isAdmin?[...NAV,['admin','Admin']]:NAV).map(([k,l])=>`<button class="nav ${view===k?'on':''}" data-v="${k}">${k==='cfg'?'<span class="md:hidden">Ajustes</span><span class="hidden md:inline">Configuración</span>':l}</button>`).join('');
   $('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{view=b.dataset.v;render()});
-  $('#view').innerHTML=({dash,alumnos:vAlumnos,disc:vDisc,pagos:vPagos,cfg:vCfg})[view]();renderAlerts();
+  $('#view').innerHTML=({dash,alumnos:vAlumnos,disc:vDisc,pagos:vPagos,cfg:vCfg,admin:vAdmin})[view]();renderAlerts();
 }
 const head=(t,sub,btn)=>`<div class="flex flex-wrap items-end justify-between gap-3 mb-6"><div><h2 class="hd text-4xl font-bold">${t}</h2><p style="color:var(--mute)">${sub}</p></div>${btn||''}</div>`;
 const empty=t=>`<div class="p-8 text-center" style="color:var(--mute)">${t}</div>`;
@@ -301,7 +306,7 @@ function vPagos(){
     <select class="inp" style="width:auto" aria-label="Estado" onchange="filt.estado=this.value;render()"><option value="">Todos los estados</option>${['Pagado','Pendiente','Por vencer','Vencido'].map(s=>`<option ${filt.estado===s?'selected':''}>${s}</option>`).join('')}</select>
     <select class="inp" style="width:auto" aria-label="Período" onchange="filt.periodo=this.value;render()"><option value="">Todos los períodos</option>${per.map(p=>`<option value="${p}" ${filt.periodo===p?'selected':''}>${perLabel(p)}</option>`).join('')}</select>
     <span class="text-sm" style="color:var(--mute)">Cobrado en esta vista: <b style="color:var(--ok)">${money(total)}</b></span></div>
-  <div class="card scroll">${list.length?`<table class="w-full"><thead><tr><th>Alumno</th><th>Período</th><th>Disciplinas</th><th>Monto</th><th>Próx. venc.</th><th>Pagado el</th><th>Estado</th><th></th></tr></thead><tbody>${list.map(p=>`<tr><td class="font-medium">${esc(alumno(p.alumno)?.nombre||'Alumno eliminado')}</td><td>${perLabel(p.periodo)}</td><td>${(p.discs||[]).map(i=>disc(i)?`<span class="chip">${esc(disc(i).nombre)}</span>`:'').join('')||'—'}</td><td>${money(p.monto)}${p.recargo?`<div class="text-xs" style="color:var(--warn)">incluye recargo ${money(p.recargo)}</div>`:''}</td><td>${fdate(p.vence)}</td><td>${fdate(p.fecha)}</td><td>${tag(estado(p))}</td><td class="text-right whitespace-nowrap">${p.pagado?'':`<button class="btn2" onclick="markPaid('${p.id}')">Marcar pagado</button> `}<button class="btn2" onclick="formPago('${p.id}')">Editar</button> <button class="btn2" style="color:var(--bad)" onclick="delP('${p.id}')">Eliminar</button></td></tr>`).join('')}</tbody></table>`:empty('No hay pagos con estos filtros. Registrá uno nuevo o cambiá los filtros.')}</div>`;
+  <div class="card scroll">${list.length?`<table class="w-full"><thead><tr><th>Alumno</th><th>Período</th><th>Disciplinas</th><th>Monto</th><th>Próx. venc.</th><th>Pagado el</th><th>Estado</th><th></th></tr></thead><tbody>${list.map(p=>`<tr><td class="font-medium">${esc(alumno(p.alumno)?.nombre||'Alumno eliminado')}</td><td>${perLabel(p.periodo)}</td><td>${(p.discs||[]).map(i=>disc(i)?`<span class="chip">${esc(disc(i).nombre)}</span>`:'').join('')||'—'}</td><td>${money(p.monto)}${p.recargo?`<div class="text-xs" style="color:var(--warn)">incluye recargo ${money(p.recargo)}</div>`:''}${p.desc?`<div class="text-xs" style="color:var(--ok)">descuento ${esc(p.descN||'')} −${money(p.desc)}</div>`:''}</td><td>${fdate(p.vence)}</td><td>${fdate(p.fecha)}</td><td>${tag(estado(p))}</td><td class="text-right whitespace-nowrap">${p.pagado?'':`<button class="btn2" onclick="markPaid('${p.id}')">Marcar pagado</button> `}<button class="btn2" onclick="formPago('${p.id}')">Editar</button> <button class="btn2" style="color:var(--bad)" onclick="delP('${p.id}')">Eliminar</button></td></tr>`).join('')}</tbody></table>`:empty('No hay pagos con estos filtros. Registrá uno nuevo o cambiá los filtros.')}</div>`;
 }
 let pAuto=true,pEdit=null;
 function formPago(id){
@@ -315,6 +320,7 @@ function formPago(id){
   ${field('Próximo vencimiento (se calcula solo)',`<input name="v" id="pv" type="date" required class="inp" value="${p?p.vence:addMes(f0)}">`)}
   ${legacy?'<label class="flex items-center gap-2 text-sm font-medium mb-3"><input type="checkbox" id="pg">Ya fue pagado</label>':''}
   ${field('Recargo (ARS)',`<input name="r" id="pr" type="number" min="0" class="inp" value="${p?(p.recargo||0):0}" oninput="pAuto=false;pCalc()">`)}
+  <div class="mb-3 text-sm font-medium">Descuento<div class="mt-1 font-normal">${cfgD().length?`<select id="pds" class="inp mb-2" onchange="pCalc(true)"><option value="">Sin descuento</option>${cfgD().map(d=>`<option value="${d.id}" ${p&&p.descN===d.n?'selected':''}>${esc(d.n)} (${d.t==='pct'?d.v+'%':money(d.v)})</option>`).join('')}</select>`:''}<input name="dd" id="pdd" type="number" min="0" class="inp" placeholder="Monto en ARS" value="${p?(p.desc||0):0}" oninput="if($('#pds'))$('#pds').value='';pCalc()"></div></div>
   <div id="pt" class="rounded-md p-3 text-sm" style="background:#f3f7f6"></div>
   ${actions('Guardar')}</form>`);pDiscs(p?p.discs||[]:null);
 }
@@ -322,19 +328,21 @@ function pDiscs(sel){const a=alumno($('#pa').value);if(!pEdit)pAuto=true;
   $('#pd').innerHTML=S.disc.map(d=>{const own=a.insc.some(i=>i.d===d.id),on=sel?sel.includes(d.id):own;return`<label class="flex items-center gap-2 text-sm py-0.5"><input type="checkbox" value="${d.id}" data-p="${d.precio}" ${on?'checked':''} onchange="pCalc(true)">${esc(d.nombre)} · ${money(d.precio)}${own?'':' <span style="color:var(--mute)">(se agrega al alumno)</span>'}</label>`}).join('');pCalc(true)}
 function pDate(){const f=$('#pf').value;if(f)$('#pv').value=addMes(f);pCalc(true)}
 function pBase(){const c=[...document.querySelectorAll('#pd input:checked')],ids=c.map(x=>x.value);
-  if(pEdit&&ids.length&&ids.length===(pEdit.discs||[]).length&&ids.every(i=>pEdit.discs.includes(i)))return Math.max(0,pEdit.monto-(pEdit.recargo||0));
+  if(pEdit&&ids.length&&ids.length===(pEdit.discs||[]).length&&ids.every(i=>pEdit.discs.includes(i)))return Math.max(0,pEdit.monto-(pEdit.recargo||0)+(pEdit.desc||0));
   return c.reduce((t,x)=>t+Number(x.dataset.p),0)}
 function pCalc(re){const a=alumno($('#pa').value),b=pBase(),f=$('#pf').value,due=dueDe(a);
   if(re&&pAuto)$('#pr').value=f?recargoDe(b,due,f):0;
-  const r=Math.max(0,Number($('#pr').value)||0);
-  $('#pt').innerHTML=`<div class="flex justify-between"><span>Cuota</span><span>${money(b)}</span></div>`+(r?`<div class="flex justify-between" style="color:var(--warn)"><span>Recargo</span><span>${money(r)}</span></div>`:'')+`<div class="flex justify-between font-semibold text-base pt-1 mt-1" style="border-top:1px solid var(--line)"><span>Total</span><span>${money(b+r)}</span></div>`+(!pEdit&&due?`<div class="text-xs mt-1" style="color:var(--mute)">Su vencimiento anterior era el ${fdate(due)}.</div>`:'')}
+  const r=Math.max(0,Number($('#pr').value)||0),ds=$('#pds')?cfgD().find(x=>x.id===$('#pds').value):null;
+  if(re&&ds)$('#pdd').value=ds.t==='pct'?Math.round(b*ds.v/100):ds.v;
+  const dsc=Math.min(b+r,Math.max(0,Number($('#pdd').value)||0));
+  $('#pt').innerHTML=`<div class="flex justify-between"><span>Cuota</span><span>${money(b)}</span></div>`+(r?`<div class="flex justify-between" style="color:var(--warn)"><span>Recargo</span><span>${money(r)}</span></div>`:'')+(dsc?`<div class="flex justify-between" style="color:var(--ok)"><span>Descuento</span><span>−${money(dsc)}</span></div>`:'')+`<div class="flex justify-between font-semibold text-base pt-1 mt-1" style="border-top:1px solid var(--line)"><span>Total</span><span>${money(b+r-dsc)}</span></div>`+(!pEdit&&due?`<div class="text-xs mt-1" style="color:var(--mute)">Su vencimiento anterior era el ${fdate(due)}.</div>`:'')}
 function addP(e,id){e.preventDefault();const f=new FormData(e.target),ids=[...document.querySelectorAll('#pd input:checked')].map(i=>i.value);
   if(!ids.length){alert('Elegí al menos una disciplina.');return false}
   const pg=id&&$('#pg')?$('#pg').checked:true,fecha=f.get('f');
   if(pg&&!fecha){alert('Indicá la fecha de pago.');return false}
   const a=alumno(f.get('a')),r=Math.max(0,Number(f.get('r'))||0),b=pBase();
   ids.forEach(d=>{if(!a.insc.some(i=>i.d===d))a.insc.push({d,h:''})});
-  const data={alumno:a.id,discs:ids,monto:b+r,recargo:r,fecha:pg?fecha:'',vence:f.get('v'),periodo:(fecha||f.get('v')).slice(0,7),pagado:pg};
+  const dsc=Math.min(b+r,Math.max(0,Number(f.get('dd'))||0)),o=cfgD().find(x=>x.id===($('#pds')?$('#pds').value:'')),data={alumno:a.id,discs:ids,monto:b+r-dsc,recargo:r,desc:dsc,descN:dsc?(o?o.n:'Descuento'):'',fecha:pg?fecha:'',vence:f.get('v'),periodo:(fecha||f.get('v')).slice(0,7),pagado:pg};
   if(id)Object.assign(S.pagos.find(x=>x.id===id),data);else S.pagos.push({id:uid(),...data});
   save();closeModal();render();return false}
 function markPaid(id){const p=S.pagos.find(x=>x.id===id);let r=recargoDe(p.monto,p.vence,iso(today));
@@ -396,6 +404,46 @@ function vRc(){const r=cfgR();
   return `<div class="card p-6 max-w-lg mt-4"><h3 class="hd text-2xl font-bold mb-1">Recargo por atraso</h3><p class="text-sm mb-2" style="color:var(--mute)">Si tu centro no cobra recargo, dejalo desactivado. Se calcula al registrar el pago y podés quitarlo en cada caso.</p>
   <div class="flex items-start gap-2 text-sm py-2"><input type="checkbox" class="mt-1" ${r.on?'checked':''} onchange="setRc('on',this.checked)"><span>Cobrar recargo a las cuotas pagadas con ${numIn(r.dias,"setRc('dias',this.value)")} días o más de atraso.</span></div>
   <div class="flex flex-wrap items-center gap-2 text-sm"><span>Recargo de</span>${numIn(r.valor,"setRc('valor',this.value)",'6rem')}<select class="inp" style="width:auto" onchange="setRc('tipo',this.value)"><option value="pct" ${r.tipo==='pct'?'selected':''}>% de la cuota</option><option value="fijo" ${r.tipo==='fijo'?'selected':''}>pesos (monto fijo)</option></select></div></div>`}
+/* ---------- plan, administración y descuentos ---------- */
+let isAdmin=false,ADM=null;
+function showPlan(i){
+  const t=!i?'':i.left===null?'Plan activo':`${i.est==='prueba'?'Prueba gratis':'Plan activo'} · ${i.left} ${i.left===1?'día':'días'}`;
+  const tt=i&&i.hs?'Vence el '+new Date(i.hs).toLocaleDateString('es-AR'):'';
+  ['#plan','#planm'].forEach(q=>{const e=$(q);e.textContent=t;e.title=tt;if(q==='#planm')e.hidden=!t});
+  const b=$('#banner'),soon=!!i&&i.left!==null&&i.left<=7;b.hidden=!soon;
+  if(soon)b.textContent=`Tu ${i.est==='prueba'?'prueba gratuita':'plan'} vence en ${i.left} ${i.left===1?'día':'días'}. ${CONTACTO}`}
+const addMonths=(ms,n)=>{const d=new Date(ms),day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+n);d.setDate(Math.min(day,new Date(d.getFullYear(),d.getMonth()+1,0).getDate()));return d.getTime()};
+const licLeft=l=>l.estado==='prueba'?Math.ceil(TRIAL-(Date.now()-l.creado)/864e5):l.estado==='activo'&&l.hasta?Math.ceil((l.hasta-Date.now())/864e5):null;
+async function loadAdm(){const {collection,getDocs}=F.fs;
+  try{const q=await getDocs(collection(F.db,'licencias'));ADM=q.docs.map(x=>{const d=x.data();return{id:x.id,email:d.email||x.id,estado:d.estado,creado:d.creado&&d.creado.toDate?d.creado.toDate().getTime():0,hasta:d.hasta&&d.hasta.toDate?d.hasta.toDate().getTime():null}})}catch(e){ADM=[]}
+  if(view==='admin')render()}
+async function admSet(id,patch){const {doc,updateDoc,Timestamp}=F.fs,d={...patch};if(d.hasta)d.hasta=Timestamp.fromMillis(d.hasta);
+  try{await updateDoc(doc(F.db,'licencias',id),d);Object.assign(ADM.find(x=>x.id===id),patch);render()}catch(e){alert('No se pudo guardar el cambio. Revisá que las reglas nuevas estén publicadas.')}}
+function admAdd(id,n){const l=ADM.find(x=>x.id===id);let base=Date.now();
+  if(l.estado==='activo'&&l.hasta>base)base=l.hasta;
+  if(l.estado==='prueba'){const te=l.creado+TRIAL*864e5;if(te>base)base=te}
+  admSet(id,{estado:'activo',hasta:addMonths(base,n)})}
+function admStop(id){if(confirm('¿Suspender el acceso de este centro? Sus datos no se borran.'))admSet(id,{estado:'suspendido'})}
+function vAdmin(){
+  if(!isAdmin)return'';
+  if(!ADM){loadAdm();return head('Administración','Centros registrados')+`<div class="card">${empty('Cargando centros…')}</div>`}
+  const key=l=>l.estado==='suspendido'||licLeft(l)===null?9999:licLeft(l),L=[...ADM].sort((a,b)=>key(a)-key(b));
+  const tg=l=>{const d=licLeft(l);return l.estado==='suspendido'?'<span class="tag Vencido">Suspendido</span>':d!==null&&d<=0?'<span class="tag Vencido">Vencido</span>':l.estado==='activo'?'<span class="tag Pagado">Activo</span>':'<span class="tag Porvencer">Prueba</span>'};
+  const fin=l=>l.estado==='prueba'?l.creado+TRIAL*864e5:l.hasta;
+  const act=L.filter(l=>l.estado==='activo'&&(licLeft(l)===null||licLeft(l)>0)).length,pru=L.filter(l=>l.estado==='prueba'&&licLeft(l)>0).length;
+  return head('Administración',`${L.length} centros · ${act} con plan activo · ${pru} en prueba`,`<button class="btn2" onclick="ADM=null;render()">Actualizar</button>`)+
+  `<div class="card scroll">${L.length?`<table class="w-full"><thead><tr><th>Centro (correo)</th><th>Estado</th><th>Días restantes</th><th>Vence</th><th>Agregar tiempo</th><th></th></tr></thead><tbody>${L.map(l=>{const d=licLeft(l),f=fin(l);return`<tr><td class="font-medium">${esc(l.email)}</td><td>${tg(l)}</td><td>${d===null?(l.estado==='activo'?'Sin límite':'—'):Math.max(0,d)}</td><td>${f&&l.estado!=='suspendido'?new Date(f).toLocaleDateString('es-AR'):'—'}</td><td class="whitespace-nowrap">${[[1,'+1 mes'],[3,'+3 meses'],[6,'+6 meses'],[12,'+1 año']].map(([n,t])=>`<button class="btn2" onclick="admAdd('${l.id}',${n})">${t}</button>`).join(' ')}</td><td class="text-right">${l.estado==='suspendido'?'':`<button class="btn2" style="color:var(--bad)" onclick="admStop('${l.id}')">Suspender</button>`}</td></tr>`}).join('')}</tbody></table>`:empty('Todavía no hay centros registrados.')}</div>
+  <p class="text-xs mt-3" style="color:var(--mute)">Al agregar tiempo, el plan queda activo y se suma desde su vencimiento (o desde hoy si ya venció). Suspender corta el acceso sin borrar datos; para reactivar, agregá tiempo.</p>`}
+const cfgD=()=>(S&&S.cfg.descuentos)||[];
+function addDsc(){const n=$('#dn').value.trim(),v=Number($('#dv').value),t=$('#dt').value;
+  if(!n||!(v>0)){alert('Escribí el nombre y un valor mayor a 0.');return}
+  if(t==='pct'&&v>100){alert('El porcentaje no puede superar 100.');return}
+  S.cfg.descuentos=[...cfgD(),{id:uid(),n,t,v}];save();render()}
+function delDsc(id){S.cfg.descuentos=cfgD().filter(d=>d.id!==id);save();render()}
+function vDsc(){const l=cfgD();
+  return `<div class="card p-6 max-w-lg mt-4"><h3 class="hd text-2xl font-bold mb-1">Descuentos</h3><p class="text-sm mb-2" style="color:var(--mute)">Cargá los descuentos que ofrece tu centro (hermanos, cupones, etc.). Al registrar un pago elegís cuál aplicar.</p>
+  ${l.length?l.map(d=>`<div class="flex justify-between items-center py-2 text-sm" style="border-bottom:1px solid var(--line)"><span><b>${esc(d.n)}</b> · ${d.t==='pct'?d.v+'%':money(d.v)}</span><button type="button" class="btn2" style="color:var(--bad)" onclick="delDsc('${d.id}')">Quitar</button></div>`).join(''):'<p class="text-sm py-2" style="color:var(--mute)">Todavía no cargaste descuentos.</p>'}
+  <div class="flex flex-wrap items-center gap-2 mt-3"><input id="dn" class="inp" style="flex:1;min-width:8rem;width:auto" placeholder="Nombre (ej: Hermanos)"><input id="dv" type="number" min="0" class="inp" style="width:5.5rem" placeholder="Valor"><select id="dt" class="inp" style="width:auto"><option value="pct">%</option><option value="fijo">$</option></select><button type="button" class="btn" onclick="addDsc()">Agregar</button></div></div>`}
 /* ---------- apariencia ---------- */
 const DEFT={acc:'#0e7c86',side:'#0f3441',velo:85};
 const PRE=[['Turquesa','#0e7c86','#0f3441'],['Azul','#2563eb','#14213d'],['Verde cancha','#15803d','#14352a'],['Naranja','#ea580c','#3a2417'],['Violeta','#7c3aed','#2e1a47'],['Rojo y negro','#dc2626','#1c1c1f'],['Rosa','#db2777','#3b1230'],['Claro','#0e7c86','#dfe9e8']];
@@ -427,7 +475,7 @@ function vApar(){const t={...DEFT,...(S.cfg.tema||{})};
   <div class="flex items-center gap-4 mb-3"><img id="fp" ${S.cfg.fondo?`src="${S.cfg.fondo}"`:'hidden'} alt="Fondo" class="h-16 w-24 object-cover rounded" style="border:1px solid var(--line)"><div><input type="file" accept="image/*" onchange="fondoUp(this)" class="text-sm"><button type="button" class="btn2 mt-2" onclick="quitaFondo()">Quitar fondo</button></div></div>
   <label class="block text-sm font-medium">Opacidad del velo sobre el fondo<input type="range" min="40" max="95" value="${t.velo}" class="w-full" oninput="setTema({velo:+this.value})"><span class="text-xs font-normal" style="color:var(--mute)">Más alto = fondo más suave y texto más fácil de leer.</span></label>
   <button type="button" class="btn2 mt-4" onclick="resetTema()">Restablecer colores</button></div>`}
-function vCfg(){const h=vCfg0(),k='<div class="card p-6 max-w-lg mt-4"><h3 class="hd text-2xl font-bold mb-1">Empezar de cero';const i=h.indexOf(k);const x=vApar()+vAl()+vEs()+vRc();return i<0?h+x:h.slice(0,i)+x+h.slice(i)}
+function vCfg(){const h=vCfg0(),k='<div class="card p-6 max-w-lg mt-4"><h3 class="hd text-2xl font-bold mb-1">Empezar de cero';const i=h.indexOf(k);const x=vApar()+vAl()+vEs()+vRc()+vDsc();return i<0?h+x:h.slice(0,i)+x+h.slice(i)}
 function vCfg0(){tmpLogo=S.cfg.logo||'';
   return head('Configuración','Nombre, apariencia, alertas y recargos de tu establecimiento')+
   `<div class="card p-6 max-w-lg"><form onsubmit="return saveCfg(event)">
